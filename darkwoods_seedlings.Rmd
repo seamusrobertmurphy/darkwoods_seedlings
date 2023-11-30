@@ -1,0 +1,182 @@
+---
+title: "Spatial Point Process Model of Seedling Patterns; Darkwoods Conservation Area"
+author: "SMurphy"
+date: "2021-01-30"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+install.packages(c("readxl", "sf", "kernlab", "ggplot2", "dplyr", 
+                   "RColorBrewer", "psych", "useful", "caret", 
+                   "tibble", "klaR", "ModelMetrics", "DescTools", 
+                   "MLmetrics", "coefplot", "glmnet", "jsonlite", "plotly", "RSQLite", "tidyverse", "useful", "xgboost"), dependencies=TRUE)
+library(coefplot)
+library(readxl)
+library(sf)
+library(kernlab)
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+library(useful)
+library(caret)
+library(tibble)
+library(klaR)
+library(ModelMetrics)
+library(DescTools)
+library(coefplot)
+library(glmnet)
+library(jsonlite)
+library(plotly)
+library(tidyverse)
+library(useful)
+library(xgboost)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA)
+```
+
+## Import
+
+Seed set to `123` for replication. Import master dataset of spatial covariates and seedlings attributes sampled at stem locations.
+
+```{r}
+set.seed(123) 
+darkwoods_seedlings_dataset <- read_excel("darkwoods_seedlings_data.xls")
+knitr::kable(darkwoods_seedlings_dataset)
+```
+
+## Covariate Screening
+
+Generate linear models to explore covariate effects against intercept only models
+
+```{r}
+seed_formula = intensity ~ distance_m + elevation_asl + slope + 
+  aspect + rix + twi + wind + mpb_grey + 
+  mpb_red + fire_high + fire_med + fire_low - 1 
+
+seed_formula2 = intensity ~ distance_m + elevation_asl + slope + 
+  aspect + rix + twi + wind + mpb_grey + 
+  mpb_red + fire_high2 + fire_med2 + fire_low2 + fire_unbur2 - 1 
+
+seed_formula3 = intensity ~ distance_m + elevation_asl + slope + 
+  aspect + rix + twi + wind + ndmi_unclip + 
+  fire_high2 + fire_med2 + fire_low2 + fire_unbur2 - 1 
+
+# Fitted with Nature Conservancy's masking protocol
+seed_formula4 = intensity ~ elevation_asl + northness + rix + twi + wind + 
+  mpb_high + mpb_med + mpb_trace + mpb_refugia + 
+  fire_high + fire_med + fire_low + fire_unbur - 1 
+
+# Fitted with BC-WildFire's masking protocol
+seed_formula4.1 = intensity ~ elevation_asl + northness + rix + twi + wind + 
+  ndmi_unclip + mpb_BCAerial + fire_high + fire_med + fire_low + fire_unbur - 1 
+
+# Fitted with disturbance interaction effects with burns combined
+seed_formula5 = intensity ~ distance_m + elevation_asl + slope + aspect + rix + twi + wind + 
+  ndmi_unclip + fire_high + fire_med + fire_low + fire_unbur + ndmi_unclip*fire_class - 1 
+
+# Fitted with disturbance interaction effects by individual burn classes
+seed_formula6 = intensity ~ distance_m + elevation_asl + slope + aspect + rix + twi + wind + 
+  ndmi_unclip + fire_high + fire_med + fire_low + fire_unbur + ndmi_unclip*fire_high + ndmi_unclip*fire_low - 1 
+
+allseeds_lm = lm(seed_formula, data=darkwoods_seedlings_data)
+allseeds_lm2 = lm(seed_formula2, data=darkwoods_seedlings_data)
+allseeds_lm3 = lm(seed_formula3, data=darkwoods_seedlings_data)
+allseeds_lm4 = lm(seed_formula4, data=darkwoods_seedlings_data) #best fit model
+allseeds_lm4.1 = lm(seed_formula4.1, data=darkwoods_seedlings_data)
+allseeds_lm5 = lm(seed_formula5, data=darkwoods_seedlings_data)
+allseeds_lm6 = lm(seed_formula6, data=darkwoods_seedlings_data)
+
+coefplot(allseeds_lm, sort='magnitude')
+coefplot(allseeds_lm2, sort='magnitude')
+coefplot(allseeds_lm3, sort='magnitude')
+coefplot(allseeds_lm4, sort='magnitude')
+coefplot(allseeds_lm4.1, sort='magnitude')
+coefplot(allseeds_lm5, sort='magnitude')
+coefplot(allseeds_lm6, sort='magnitude')
+```
+
+## Model Training
+
+```{r}
+#split into training and validation data 
+allseedsX_train <- build.x(allseeds_lm, data=darkwoods_seedlings_data,
+                           contrasts = FALSE, sparse = TRUE)
+allseedsY_train <- build.y(allseeds_lm, data=darkwoods_seedlings_data)
+
+allseedsX_train2 <- build.x(allseeds_lm2, data=darkwoods_seedlings_data,
+                           contrasts = FALSE, sparse = TRUE)
+allseedsY_train2 <- build.y(allseeds_lm2, data=darkwoods_seedlings_data)
+
+allseedsX_train3 <- build.x(allseeds_lm3, data=darkwoods_seedlings_data,
+                           contrasts = FALSE, sparse = TRUE)
+allseedsY_train3 <- build.y(allseeds_lm3, data=darkwoods_seedlings_data)
+
+allseedsX_train4 <- build.x(allseeds_lm4, data=darkwoods_seedlings_data,
+                            contrasts = FALSE, sparse = TRUE)
+allseedsY_train4 <- build.y(allseeds_lm4, data=darkwoods_seedlings_data)
+
+allseedsX_train4 <- build.x(allseeds_lm4, data=darkwoods_seedlings_data_July04,
+                            contrasts = FALSE, sparse = TRUE)
+allseedsY_train4 <- build.y(allseeds_lm4, data=darkwoods_seedlings_data_July04)
+
+allseedsX_train4.1 <- build.x(allseeds_lm4.1, data=darkwoods_seedlings_data,
+                            contrasts = FALSE, sparse = TRUE)
+allseedsY_train4.1 <- build.y(allseeds_lm4.1, data=darkwoods_seedlings_data)
+
+allseedsX_train5 <- build.x(allseeds_lm5, data=darkwoods_seedlings_data,
+                            contrasts = FALSE, sparse = TRUE)
+allseedsY_train5 <- build.y(allseeds_lm5, data=darkwoods_seedlings_data)
+
+allseedsX_train6 <- build.x(allseeds_lm6, data=darkwoods_seedlings_data,
+                            contrasts = FALSE, sparse = TRUE)
+allseedsY_train6 <- build.y(allseeds_lm6, data=darkwoods_seedlings_data)
+
+
+#run glmnet penalized regression with 2 different lambda's:  
+#run with lasso to suppress outliers (lasso is chosen when alpha=1 - default option)
+#run with ridge to find correlation (ridge is chosen when alpha=0)
+#run with elastic-net to choose between lasso and ridge (% of alpha)
+allseeds_glmnet_lasso <- glmnet(x=allseedsX_train, y=allseedsY_train, family = 'gaussian', alpha = 1)
+allseeds_glmnet_ridge <- glmnet(x=allseedsX_train, y=allseedsY_train, family = 'gaussian', alpha = 0)
+coefpath(allseeds_glmnet_lasso)
+coefpath(allseeds_glmnet_ridge)
+
+allseeds_glmnet_lasso2 <- glmnet(x=allseedsX_train2, y=allseedsY_train2, family = 'gaussian', alpha = 1)
+allseeds_glmnet_ridge2 <- glmnet(x=allseedsX_train2, y=allseedsY_train2, family = 'gaussian', alpha = 0)
+coefpath(allseeds_glmnet_lasso2)
+coefpath(allseeds_glmnet_ridge2)
+
+allseeds_glmnet_lasso3 <- glmnet(x=allseedsX_train3, y=allseedsY_train3, family = 'gaussian', alpha = 1)
+allseeds_glmnet_ridge3 <- glmnet(x=allseedsX_train3, y=allseedsY_train3, family = 'gaussian', alpha = 0)
+coefpath(allseeds_glmnet_lasso3)
+coefpath(allseeds_glmnet_ridge3)
+
+allseeds_glmnet_lasso4 <- glmnet(x=allseedsX_train4, y=allseedsY_train4, family = 'gaussian', alpha = 1)
+allseeds_glmnet_ridge4 <- glmnet(x=allseedsX_train4, y=allseedsY_train4, family = 'gaussian', alpha = 0)
+coefpath(allseeds_glmnet_lasso4)
+coefpath(allseeds_glmnet_ridge4)
+
+allseeds_glmnet_lasso4.1 <- glmnet(x=allseedsX_train4.1, y=allseedsY_train4.1, family = 'gaussian', alpha = 1)
+allseeds_glmnet_ridge4.1 <- glmnet(x=allseedsX_train4.1, y=allseedsY_train4.1, family = 'gaussian', alpha = 0)
+coefpath(allseeds_glmnet_lasso4.1)
+coefpath(allseeds_glmnet_ridge4.1)
+
+allseeds_glmnet_lasso5 <- glmnet(x=allseedsX_train5, y=allseedsY_train5, family = 'gaussian', alpha = 1)
+allseeds_glmnet_ridge5 <- glmnet(x=allseedsX_train5, y=allseedsY_train5, family = 'gaussian', alpha = 0)
+coefpath(allseeds_glmnet_lasso5)
+coefpath(allseeds_glmnet_ridge5)
+
+allseeds_glmnet_lasso6 <- glmnet(x=allseedsX_train6, y=allseedsY_train6, family = 'gaussian', alpha = 1)
+allseeds_glmnet_ridge6 <- glmnet(x=allseedsX_train6, y=allseedsY_train6, family = 'gaussian', alpha = 0)
+coefpath(allseeds_glmnet_lasso6)
+coefpath(allseeds_glmnet_ridge6)
+
+
+#run cross-validation 
+allseeds_glmnet_lasso_cv_10fold <- cv.glmnet(x=allseedsX_train, y=allseedsY_train,
+                                             family='gaussian',
+                                             alpha=1,
+                                             nfolds = 10)
+
+#see reduced list of predictor variables
+coefpath(allseeds_glmnet_lasso_cv_10fold)
+plot(allseeds_glmnet_lasso_cv_10fold)
