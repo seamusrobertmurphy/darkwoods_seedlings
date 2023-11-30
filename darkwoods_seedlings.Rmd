@@ -33,7 +33,9 @@ library(ModelMetrics)
 library(DescTools)
 library(knitr)
 library(kableExtra)
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, comment = NA,tidy.opts=list(width.cutoff=60),tidy=TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, 
+                      comment = NA,tidy.opts=list(width.cutoff=60),tidy=TRUE)
+options(knitr.table.format = "html") 
 ```
 
 ## Import
@@ -43,8 +45,10 @@ Seed set to `123` for replication. Import master dataset of spatial covariates a
 ```{r}
 set.seed(123) 
 darkwoods_seedlings_data <- read_excel("1.1.darkwoods_masterfile.xlsx")
-kbl(darkwoods_seedlings_data) %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+darkwoods_seedlings_data %>%
+  kbl
+kable(darkwoods_seedlings_data, format="html") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 ```
 
 ## Covariate Screening
