@@ -2,21 +2,14 @@
 title: "Spatial Point Process Model of Seedling Patterns"
 author: "SMurphy"
 date: "2021-01-30"
-output: github_document
-      number_sections: true
-          toc: true
-          toc_depth: 2
-          toc_float: true
-      always_allow_html: true
+output:
+  github_document:
+  number_sections: true
+  toc: true
+  toc_depth: 4
 ---
 
 ```{r setup, include=FALSE, message = FALSE, warning=FALSE}
-#Stage-I dependences
-install.packages(c("readxl", "sf", "kernlab", "ggplot2", "dplyr", 
-                   "RColorBrewer", "psych", "useful", "caret", 
-                   "tibble", "klaR", "ModelMetrics", "DescTools", 
-                   "MLmetrics", "coefplot", "glmnet", "jsonlite", 
-                   "plotly", "RSQLite", "tidyverse", "useful", "xgboost"), dependencies=TRUE)
 library(coefplot)
 library(glmnet)
 library(formatR)
@@ -38,19 +31,12 @@ library(flextable)
 library(pandoc)
 library(rmarkdown)
 
-#Stage-II dependencies
-install.packages(c("spdep", "gstat", "rgdal", "maptools", "raster", 
-                                  "spatstat", "GISTools", "rgeos", "sp", 
-                                  "rpanel", "ncf", "spatial", "spatstat.data", 
-                                  "spatstat.local", "dplyr", "RColorBrewer"), dependencies=TRUE)
 library(spdep)
 library(gstat)
 library(rgdal)
 library(maptools)
 library(raster)
 library(spatstat)
-library(GISTools)
-library(rgeos)
 library(sp)
 library(rpanel)
 library(ncf)
@@ -67,13 +53,29 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
 options(knitr.table.format = "html") 
 ```
 
-## Stage I: Covariate Screening
+```{r, eval=FALSE, echo=FALSE}
+#Note: some packages require R-version >4.3 installed 
+#Stage-I dependencies
+install.packages(c("readxl", "sf", "kernlab", "ggplot2", "dplyr", 
+                   "RColorBrewer", "psych", "useful", "caret", 
+                   "tibble", "klaR", "ModelMetrics", "DescTools", 
+                   "MLmetrics", "coefplot", "glmnet", "jsonlite", 
+                   "plotly", "RSQLite", "tidyverse", "useful", "xgboost"), dependencies=TRUE)
+
+#Stage-II dependencies
+install.packages(c("spdep", "gstat", "rgdal", "maptools", "raster", 
+                                  "spatstat", "GISTools", "rgeos", "sp", 
+                                  "rpanel", "ncf", "spatial", "spatstat.data", 
+                                  "spatstat.local", "dplyr", "RColorBrewer"), dependencies=TRUE)
+```
+
+## Stage I: Covariate Selection
 
 ### Import Data+Packages
 
 Seed set to `123` for replication. Import `darkwoods_masterfile` dataset representing covariates and seedling values sampled at stem locations. Package dependencies listed here and silently above in case cloning misses on auto-loading. Care taken as `spatstat` package is the most pernickety. Document package additions in `requirements-I` before pushing to repo with environment commented.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 set.seed(123) 
 darkwoods_seedlings_data <- read_excel("1.1.darkwoods_masterfile.xlsx")
 darkwoods_seedlings_data %>%
@@ -81,7 +83,7 @@ darkwoods_seedlings_data %>%
     align(j = 2:ncol_keys(.), align = "center")
 ```
 
-```{r,eval=FALSE}
+```{r,eval=FALSE, warning=FALSE, message=FALSE}
 requirements-I = install.packages(c("readxl", "sf", "kernlab", "ggplot2", "dplyr", 
                                   "RColorBrewer", "psych", "useful", "caret", 
                                   "tibble", "klaR", "ModelMetrics", "DescTools", 
@@ -94,7 +96,7 @@ requirements-I # set with 'warnings=FALSE'
 
 Derive OLS models to explore covariate effects against intercept only models
 
-```{r, fig.show='hold', out.width='33%'}
+```{r, fig.show='hold', out.width='33%', warning=FALSE, message=FALSE}
 seed_formula = intensity ~ distance_m + elevation_asl + slope + 
   aspect + rix + twi + wind + mpb_grey + mpb_red + 
   fire_high + fire_med + fire_low - 1 
@@ -146,7 +148,7 @@ coefplot(allseeds_lm6.2, sort='magnitude')
 
 Split into training and test data subset for each model with covariates and repsonse variables mounted.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 allseedsX_train <- build.x(allseeds_lm, data=darkwoods_seedlings_data,
                            contrasts = FALSE, sparse = TRUE)
 allseedsY_train <- build.y(allseeds_lm, data=darkwoods_seedlings_data)
@@ -216,7 +218,7 @@ plot(allseeds_glmnet_ridge6.2)
 
 Adding the `nfolds` function, we apply a 10K-fold cross validation to measure the generalized and singular effects of covariates. Taken from `coefplot` package, the `coefpath` function produces an interactive graph of covariance and reduced magnitude as the model approaches a mean of zero. Zoom in to distinguish remaining predictors and their coefficients.
 
-```{r, eval=FALSE}
+```{r, eval=FALSE, warning=FALSE, message=FALSE}
 allseeds_glmnet_lasso_cv_10fold <- cv.glmnet(x=allseedsX_train, y=allseedsY_train, family='gaussian', alpha=1, nfolds = 10)
 allseeds_glmnet_ridge_cv_10fold <- cv.glmnet(x=allseedsX_train, y=allseedsY_train, family='gaussian', alpha=0, nfolds = 10)
 allseeds_glmnet_lasso2_cv_10fold <- glmnet(x=allseedsX_train2, y=allseedsY_train2, family = 'gaussian', alpha = 1, nfolds = 10)
@@ -264,7 +266,7 @@ coefpath(allseeds_glmnet_lasso6.2_cv_10fold)
 coefpath(allseeds_glmnet_ridge6.2_cv_10fold)
 ```
 
-```{r, echo=FALSE, fig.show='hold', out.width='25%'}
+```{r, echo=FALSE, fig.show='hold', out.width='25%', warning=FALSE, message=FALSE}
 allseeds_glmnet_lasso_cv_10fold <- cv.glmnet(x=allseedsX_train, y=allseedsY_train, family='gaussian', alpha=1, nfolds = 10)
 allseeds_glmnet_ridge_cv_10fold <- cv.glmnet(x=allseedsX_train, y=allseedsY_train, family='gaussian', alpha=0, nfolds = 10)
 allseeds_glmnet_lasso2_cv_10fold <- glmnet(x=allseedsX_train2, y=allseedsY_train2, family = 'gaussian', alpha = 1, nfolds = 10)
@@ -299,20 +301,20 @@ plot(allseeds_glmnet_ridge6.2_cv_10fold)
 
 ```{r, echo=FALSE, fig.show='hold', out.width='50%'}
 coefpath(allseeds_glmnet_lasso_cv_10fold)
-coefpath(allseeds_glmnet_lasso_cv_10fold)
-coefpath(allseeds_glmnet_ridge_cv_10fold)
-coefpath(allseeds_glmnet_lasso2_cv_10fold)
-coefpath(allseeds_glmnet_ridge2_cv_10fold)
-coefpath(allseeds_glmnet_lasso3_cv_10fold)
-coefpath(allseeds_glmnet_ridge3_cv_10fold)
-coefpath(allseeds_glmnet_lasso4_cv_10fold)
-coefpath(allseeds_glmnet_ridge4_cv_10fold)
-coefpath(allseeds_glmnet_lasso5_cv_10fold)
-coefpath(allseeds_glmnet_ridge5_cv_10fold)
-coefpath(allseeds_glmnet_lasso6.1_cv_10fold)
-coefpath(allseeds_glmnet_ridge6.1_cv_10fold)
-coefpath(allseeds_glmnet_lasso6.2_cv_10fold)
-coefpath(allseeds_glmnet_ridge6.2_cv_10fold)
+#coefpath(allseeds_glmnet_lasso_cv_10fold)
+#coefpath(allseeds_glmnet_ridge_cv_10fold)
+#coefpath(allseeds_glmnet_lasso2_cv_10fold)
+#coefpath(allseeds_glmnet_ridge2_cv_10fold)
+#coefpath(allseeds_glmnet_lasso3_cv_10fold)
+#coefpath(allseeds_glmnet_ridge3_cv_10fold)
+#coefpath(allseeds_glmnet_lasso4_cv_10fold)
+#coefpath(allseeds_glmnet_ridge4_cv_10fold)
+#coefpath(allseeds_glmnet_lasso5_cv_10fold)
+#coefpath(allseeds_glmnet_ridge5_cv_10fold)
+#coefpath(allseeds_glmnet_lasso6.1_cv_10fold)
+#coefpath(allseeds_glmnet_ridge6.1_cv_10fold)
+#coefpath(allseeds_glmnet_lasso6.2_cv_10fold)
+#coefpath(allseeds_glmnet_ridge6.2_cv_10fold)
 ```
 
 ## Stage II: Spatial Point Process Modelling
@@ -321,7 +323,7 @@ coefpath(allseeds_glmnet_ridge6.2_cv_10fold)
 
 Import masterfile dataset `darkwoods_seedlings_data` which includes covariates values sampled, processed and classified from stem location of seedlings. The `spatstat` point process models also require spatial covariates as image files in `.im` format, that are converted below from raster and shapefile/GPS objects. This includes a seperate csv/xlsx dataset showing distance to nearest living seed source that is marked for cross-reference with same #ID number as seedling observations in the master dataset, as well raster stack of terrain, climate, and disurbance layers.
 
-```{r, eval=FALSE}
+```{r, eval=FALSE, warning=FALSE, message=FALSE}
 requirements-II = install.packages(c("spdep", "gstat", "rgdal", "maptools", "raster", 
                                   "spatstat", "GISTools", "rgeos", "sp", 
                                   "rpanel", "ncf", "spatial", "spatstat.data", 
@@ -330,23 +332,23 @@ requirements-II = install.packages(c("spdep", "gstat", "rgdal", "maptools", "ras
 requirements-II # settings on 'warnings=FALSE'
 ```
 
-```{r}
-darkwoods_seedlings_tree_distance = read_excel("1.2darkwoods_seedlings_distance.xls")
+```{r, warning=FALSE, message=FALSE}
+darkwoods_seedlings_tree_distance = read_excel("1.2.darkwoods_seedlings_distance.xls")
 darkwoods_seedlings_tree_distance %>%
   flextable() %>%
     align(j = 2:ncol_keys(.), align = "center")
 
-elevation_utm = readAll(raster("elevation_utm.tif"))
-aspect_utm = readAll(raster("aspect_utm.tif"))
-slope_utm = readAll(raster("slope_utm.tif"))
-rix_utm = readAll(raster("rix_utm.tif"))
-twi_utm = readAll(raster("twi_utm.tif"))
-wind_utm = readAll(raster("wind_utm.tif"))
-mpb_grey_utm = readAll(raster("mpb_grey_na.tif"))
-mpb_red_utm = readAll(raster("mpb_red_na.tif"))
-fire_high_utm = readAll(raster("fire_high_na.tif"))
-fire_med_utm = readAll(raster("fire_med_na.tif"))
-fire_low_utm = readAll(raster("fire_low_na.tif"))
+elevation_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/elevation_utm.tif"))
+aspect_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/aspect_utm.tif"))
+slope_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/slope_utm.tif"))
+rix_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/rix_utm.tif"))
+twi_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/twi_utm.tif"))
+wind_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/wind_utm.tif"))
+mpb_grey_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/mpb_grey_na.tif"))
+mpb_red_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/mpb_red_na.tif"))
+fire_high_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/fire_high_na.tif"))
+fire_med_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/fire_med_na.tif"))
+fire_low_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/fire_low_na.tif"))
 ```
 
 ### Tidy Data
@@ -357,9 +359,9 @@ At `sf` stage, prior to last two conversions, transform covariates into factors 
 
 The project's geo-projection protocol is defined by the `crsProject` variable below and set to `EPSG:32611`. This is still up for debate. Question, is it arguably better practice to project everything to the LiDAR's *original* coordinate system than to reproject everything to Landsat's *official* projection? This is assuming that LiDAR is always king in terms of georeferencing accuracy, thougb our most important predictors are Landsat-derived. Note, field equipment used in ground sampling was calibrated to `EPSG:3005`.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 crsProject = st_crs("EPSG:32611")
-seedlings_allplots_sf = st_as_sf(darkwoods_seedlings_dataset, 
+seedlings_allplots_sf = st_as_sf(darkwoods_seedlings_data, 
                                  coords = c("x", "y"), 
                                  crs = crsProject)
 
@@ -469,23 +471,23 @@ tsuga_hete_pooled = superimpose(tsuga_hete_plot1_ppp, tsuga_hete_plot2_ppp, tsug
 
 Import-tidy shapefiles of seedling plots to derive observational windows
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 read_excel("1.1.darkwoods_masterfile.xlsx")
-mask_plot1 = readOGR(dsn = "~/plots123.shps/", layer="plot1")
-mask_plot2 = readOGR(dsn = "~/plots123.shps/", layer="Plot2")
-mask_plot3 = readOGR(dsn = "~/plots123.shps/", layer="Plot3")
-mask_allplots = readOGR(dsn = "~/plots123.shps/", layer="Plot123X")
-#Projection:check coordinate reference system
-crs(mask_plot1)
-crs(mask_plot2)
-crs(mask_plot3)
-crs(mask_allplots)
-#Reprojection:assign coordinate reference system
-crs(mask_plot1) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
-crs(mask_plot2) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
-crs(mask_plot3) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
-crs(mask_allplots) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
-#Dderive observational windows
+mask_plot1 = readOGR(dsn = "~/Desktop/git_repos/darkwoods_seedlings/plots123.shps/", layer="plot1X")
+mask_plot2 = readOGR(dsn = "~/Desktop/git_repos/darkwoods_seedlings/plots123.shps/", layer="plot2X")
+mask_plot3 = readOGR(dsn = "~/Desktop/git_repos/darkwoods_seedlings/plots123.shps/", layer="plot3X")
+mask_allplots = readOGR(dsn = "~/Desktop/git_repos/darkwoods_seedlings/plots123.shps/", layer="plots123")
+#check coordinate reference system
+#crs(mask_plot1)
+#crs(mask_plot2)
+#crs(mask_plot3)
+#crs(mask_allplots)
+#assign coordinate reference system to 'sp' objects
+#crs(mask_plot1) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
+#crs(mask_plot2) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
+#crs(mask_plot3) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
+#crs(mask_allplots) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
+#Derive observational windows
 win_plot1 = as.owin(mask_plot1, unitname="meters")
 win_plot2 = as.owin(mask_plot2, unitname="meters")
 win_plot3 = as.owin(mask_plot3, unitname="meters")
@@ -574,26 +576,10 @@ marks(seedlings_plot2_ppp) <- seedlings_plot2_ppp$species
 marks(seedlings_plot3_ppp) <- seedlings_plot3_ppp$species
 marks(seedlings_allplots_ppp) <- seedlings_allplots_ppp$species
 
-
 # Distance to seed source
 distance_tree_sp = as(distance_tree, "Spatial")
 distance_tree_ppp = as(distance_tree_sp, "ppp")
 distance_tree_im = as.im.ppp(distance_tree_ppp)
-
-# double-check projections align
-crs(elevation_utm)
-crs(aspect_utm)
-crs(slope_utm)
-crs(rix_utm)
-crs(twi_utm)
-crs(wind_utm)
-crs(mpb_grey_utm)
-crs(mpb_red_utm)
-crs(mpb_grey_utm)
-crs(fire_high_utm)
-crs(fire_med_utm)
-crs(fire_low_utm)
-crs(distance_tree)
 
 #convert to image file for analysis in spatstat package
 elevation_im = as.im(elevation_utm)
@@ -624,7 +610,7 @@ hist(fire_low_im, las=1)
 
 ### Seedling Maps
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 plot(seedlings_plot1_ppp, type="n", main="Plot 1 seedlings")
 points(pinus_con_plot1_ppp,pch=20,cex=0.8,col="yellow")
 points(larix_spp_plot1_ppp,pch=20,cex=0.8,col="green3")
@@ -657,69 +643,104 @@ points(tsuga_hete_plot3_ppp,pch=20,cex=0.8,col="blue")
 
 ### Seedling Descriptives
 
-```{r}
-group_by(darkwoods_seedlings_dataset, species) %>%
+The following code chunk was used to populate descriptive statistics tables 2.1 and 2.2 in Methods section of manuscript draft, which copied directly below for reference. If columns missing, this is a markdown rendering problem, see draft for correct layout
+
+|           |               |              |                |              |               |             |
+|-----------|---------------|--------------|----------------|--------------|---------------|-------------|
+|           | **Elevation** | **Slope**    | **RIX**        | **Aspect**   | **TWI**       | **Wind**    |
+| Pooled    | 1516 (224.2)  | 13.81(7.96)  | 0.51 (0.06)    | 91.5 (58.2)  | 5.03 (1.27)   | 4.88 (0.79) |
+| Plot 1    | 1769 (14.1)   | 7.82 (4.99)  | 0.55 (0.07)    | 144.0(79.2)  | 5.19 (0.61)   | 5.75 (0.12) |
+| Plot 2    | 1672 (12.7)   | 7.56 (1.47)  | 0.48 (0.05)    | 99.2 (29.9)  | 4.78 (1.28)   | 5.32 (0.09) |
+| Plot 3    | 1251 (37.8)   | 22.5 (2.72)  | 0.50 (0.03)    | 51.7 (10.5)  | 5.13 (1.53)   | 3.97 (0.13) |
+|           |               |              |                |              |               |             |
+| Pinus c.  | 1516 (224.5)  | 13.70 (8.97) | 0.51 (0.060)   | 91.4 (57.6)  | 5.04 (1.28)   | 4.88 (0.79) |
+| Larix o.  | 1511 (226.7)  | 13.55 (8.21) | 0.508 (0.060)  | 93.9 (64.3)  | 4.942 (1.288) | 4.86 (0.80) |
+| Picea e.  | 1509 (225.1)  | 13.83 (8.20) | 0.507 (0.062)  | 91.0 (56.8)  | 5.076 (1.278) | 4.87 (0.78) |
+| Pseudo m. | 1510 (222.3)  | 14.20 (7.70) | 0.505 (0.057)  | 86.3 (48.4)  | 4.890 (1.370) | 4.85 (0.77) |
+| Pinus p.  | 1406 (208.2)  | 16.93 (7.46) | 0.491 (0.043)  | 68.6 (26.7)  | 4.996 (1.343) | 4.47 (0.68) |
+| Pinus a.  | 1709 (291.1)  | 10.15 (5.48) | 0.539 (0.060)  | 156.6(100.8) | 5.121 (0.773) | 5.59 (0.34) |
+| Tsuga h.  | 1475 (218.0)  | 13.89 (7.79) | 0.504 (0.046)  | 77.4 (28.0)  | 5.001 (0.991) | 4.89 (0.77) |
+
+|           |                           |                         |                            |
+|-----------|---------------------------|-------------------------|----------------------------|
+|           | **Beetle outbreak stage** | **Fire burn severity**  | **Biogeoclimatic subzone** |
+|           | **NA**                    | **Grey**                | **Red**                    |
+| Pooled    | 0.72                      | 0.04                    | 0.25                       |
+| Plot 1    | 0.55                      | 0.12                    | 0.33                       |
+| Plot 2    | 0.49                      | 0.02                    | 0.49                       |
+| Plot 3    | 1.00                      | 0.00                    | 0.00                       |
+|           |                           |                         |                            |
+| Pinus c.  | 0.72                      | 0.04                    | 0.24                       |
+| Larix o.  | 0.69                      | 0.05                    | 0.26                       |
+| Picea e.  | 0.66                      | 0.04                    | 0.30                       |
+| Pseudo m. | 0.74                      | 0.03                    | 0.23                       |
+| Pinus p.  | 0.79                      | 0.02                    | 0.19                       |
+| Pinus a.  | 0.63                      | 0.04                    | 0.33                       |
+| Tsuga h.  | 0.82                      | 0.00                    | 0.18                       |
+
+```{r, warning=FALSE, message=FALSE}
+group_by(darkwoods_seedlings_data, species) %>%
   summarise(count = n(),
             mean = mean(elevation_asl, na.rm = TRUE),
             sd = sd(elevation_asl, na.rm = TRUE))
 
-group_by(darkwoods_seedlings_dataset, plot123) %>%
+group_by(darkwoods_seedlings_data, plot123) %>%
   summarise(count = n(),
             mean = mean(elevation_asl, na.rm = TRUE),
             sd = sd(elevation_asl, na.rm = TRUE))
 
-group_by(darkwoods_seedlings_dataset, species) %>%
+group_by(darkwoods_seedlings_data, species) %>%
   summarise(count = n(),
             mean = mean(slope, na.rm = TRUE),
             sd = sd(slope, na.rm = TRUE))
 
-group_by(darkwoods_seedlings_dataset, plot123) %>%
+group_by(darkwoods_seedlings_data, plot123) %>%
   summarise(count = n(),
             mean = mean(slope, na.rm = TRUE),
             sd = sd(slope, na.rm = TRUE))
 
-group_by(darkwoods_seedlings_dataset, species) %>%
+group_by(darkwoods_seedlings_data, species) %>%
   summarise(count = n(),
             mean = mean(rix, na.rm = TRUE),
             sd = sd(rix, na.rm = TRUE))
 
-group_by(darkwoods_seedlings_dataset, plot123) %>%
+group_by(darkwoods_seedlings_data, plot123) %>%
   summarise(count = n(),
             mean = mean(rix, na.rm = TRUE),
             sd = sd(rix, na.rm = TRUE))
 
-group_by(darkwoods_seedlings_dataset, species) %>%
+group_by(darkwoods_seedlings_data, species) %>%
   summarise(count = n(),
             mean = mean(aspect, na.rm = TRUE),
             sd = sd(aspect, na.rm = TRUE))
 
-group_by(darkwoods_seedlings_dataset, plot123) %>%
+group_by(darkwoods_seedlings_data, plot123) %>%
   summarise(count = n(),
             mean = mean(aspect, na.rm = TRUE),
             sd = sd(aspect, na.rm = TRUE))
 
-group_by(darkwoods_seedlings_dataset, species) %>%
+group_by(darkwoods_seedlings_data, species) %>%
   summarise(count = n(),
             mean = mean(twi, na.rm = TRUE),
             sd = sd(twi, na.rm = TRUE))
 
-group_by(darkwoods_seedlings_dataset, plot123) %>%
+group_by(darkwoods_seedlings_data, plot123) %>%
   summarise(count = n(),
             mean = mean(twi, na.rm = TRUE),
             sd = sd(twi, na.rm = TRUE))
 
-describe(seedlings_allplots_sp$distance_m)
-describe(seedlings_plot1_sp$distance_m)
-describe(seedlings_plot2_sp$distance_m)
-describe(seedlings_plot3_sp$distance_m)
+psych::describe(seedlings_allplots_sp$distance_m)
+psych::describe(seedlings_plot1_sp$distance_m)
+psych::describe(seedlings_plot2_sp$distance_m)
+psych::describe(seedlings_plot3_sp$distance_m)
 
-describe(pinus_con_allplots_sp$distance_m)
-describe(larix_spp_allplots_sp$distance_m)
-describe(picea_eng_allplots_sp$distance_m)
-describe(pseudo_m_allplots_sp$distance_m)
-describe(pinus_pond_allplots_sp$distance_m)
-describe(pinus_albi_allplots_sp$distance_m)
-describe(tsuga_hete_allplots_sp$distance_m)
+psych::describe(pinus_con_allplots_sp$distance_m)
+psych::describe(larix_spp_allplots_sp$distance_m)
+psych::describe(picea_eng_allplots_sp$distance_m)
+psych::describe(pseudo_m_allplots_sp$distance_m)
+psych::describe(pinus_pond_allplots_sp$distance_m)
+psych::describe(pinus_albi_allplots_sp$distance_m)
+psych::describe(tsuga_hete_allplots_sp$distance_m)
 kruskal.test(distance_m ~ plot123, data = seedlings_allplots_sf)
 
 #Plot disturbances
@@ -746,17 +767,17 @@ table(seedlings_plot3_sp$bec_zone)/length((seedlings_plot3_sp$bec_zone))
 describe(seedlings_plot3_sp$wind)
 
 #Disturbances across plots
-table(darkwoods_seedlings_dataset$fire_class)/length((darkwoods_seedlings_dataset$fire_class))
-table(darkwoods_seedlings_dataset$mpb_class)/length((darkwoods_seedlings_dataset$mpb_class))
-table(darkwoods_seedlings_dataset$bec_zone)/length((darkwoods_seedlings_dataset$bec_zone))
-table(darkwoods_seedlings_dataset$mpb_class)/length((darkwoods_seedlings_dataset$mpb_class))
+table(darkwoods_seedlings_data$fire_class)/length((darkwoods_seedlings_data$fire_class))
+table(darkwoods_seedlings_data$mpb_class)/length((darkwoods_seedlings_data$mpb_class))
+table(darkwoods_seedlings_data$bec_zone)/length((darkwoods_seedlings_data$bec_zone))
+table(darkwoods_seedlings_data$mpb_class)/length((darkwoods_seedlings_data$mpb_class))
 
 #Disturbances between plots; ANOVA
 kruskal.test(seedlings_allplots_sp$fire_class ~ seedlings_allplots_sp$plot123)
 kruskal.test(seedlings_allplots_sp$fire_high ~ seedlings_allplots_sp$plot123)
 kruskal.test(seedlings_allplots_sp$fire_med ~ seedlings_allplots_sp$plot123)
 kruskal.test(seedlings_allplots_sp$fire_low ~ seedlings_allplots_sp$plot123)
-kruskal.test(seedlings_allplots_sp$fire_unburn~ seedlings_allplots_sp$plot123)
+#kruskal.test(seedlings_allplots_sp$fire_unburn ~ seedlings_allplots_sp$plot123)
 kruskal.test(seedlings_allplots_sp$mpb_grey~ seedlings_allplots_sp$plot123)
 kruskal.test(seedlings_allplots_sp$mpb_red~ seedlings_allplots_sp$plot123)
 
@@ -806,9 +827,9 @@ describe(tsuga_hete_allplots_sp$wind)
 
 ### Seedling Densities
 
-We test for global and local trends in seedling density using kernel density plots and nearest neighbour models. Non-spatial effects are shown by patterns in absolute density from nearest-neighbour-distance `nndist` metrics between plots and across plots by species and across species pooled. Optimal bandwidth for subsequent spatial modelling is derived using likelihood cross-validation operation `bw.ppl`. Diggle and bearman algorithm commented out, as no signficant difference found.
+We test for global and local trends in seedling density using kernel density plots and nearest neighbour models. Non-spatial effects are shown by patterns in absolute density from nearest-neighbour-distance `nndist` metrics between plots and across plots by species and across species pooled.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 #compute nearest neighbour mean distance
 ann_seedlings_allplots <- nndist.ppp(seedlings_allplots_ppp, k=1)
 ann_seedlings_plot1 <- mean(nndist(seedlings_plot1_ppp, k=1))
@@ -861,17 +882,13 @@ ann_pinus_con_plot3 <- mean(nndist(seedlings_plot3_ppp, k=1))
 ann_pinus_pond_plot3 <- mean(nndist(seedlings_plot3_ppp, k=1))
 ann_pinus_albi_plot3 <- mean(nndist(seedlings_plot3_ppp, k=1))
 ann_tsuga_hete_plot3 <- mean(nndist(seedlings_plot3_ppp, k=1))
+```
 
-#compute optimal bandwith - Diggle and Berman mean sq error cross validation method
-#bw_diggle_plot1 = bw.diggle(seedlings_plot1_ppp)
-#bw_diggle_plot2 = bw.diggle(seedlings_plot2_ppp)
-#bw_diggle_plot3 = bw.diggle(seedlings_plot3_ppp)
-#bw_diggle_allplots = bw.diggle(seedlings_allplots_ppp)
+### Seedling Bandwidths
 
-#plot(bw_diggle_plot1, main="Plot 1 - Diggle & Bearman CV-Bandwidth test")
-#plot(bw_diggle_plot1, main="Plot 1 - Diggle & Bearman CV-Bandwidth test", xlim=c(0,1))
+An optimised bandwidth for subsequent spatial modelling is derived using likelihood cross-validation operation `bw.ppl`. Diggle+Berman optimizer written as option but commented out, as no signficant difference found, unless you find otherwise??
 
-#compute optimal bandwidth using likelihood cross validation
+```{r, fig.show='hold', out.width='33%', warning=FALSE, message=FALSE}
 bw_likelihood_plot1 = bw.ppl(seedlings_plot1_ppp)
 bw_likelihood_plot2 = bw.ppl(seedlings_plot2_ppp)
 bw_likelihood_plot3 = bw.ppl(seedlings_plot3_ppp)
@@ -881,19 +898,18 @@ plot(bw_likelihood_plot1, main="Plot 1 - LCV Bandwidth", xlim=c(0,16))
 plot(bw_likelihood_plot2, main="Plot 2 - LCV Bandwidth", xlim=c(0,16))
 plot(bw_likelihood_plot3, main="Plot 3 - LCV Bandwidth", xlim=c(0,16))
 
-#plot(bw_likelihood_allplots, main="Pooled - LCV Bandwidth", xlim=c(0,16))
-#bw_likelihood_pinus_con = bw.ppl(pinus_con_allplots_ppp)
-#bw_likelihood_larix_spp = bw.ppl(larix_spp_allplots_ppp)
-#bw_likelihood_picea_eng = bw.ppl(picea_eng_allplots_ppp)
-#bw_likelihood_pseudo_m = bw.ppl(pseudo_m_allplots_ppp)
-#bw_likelihood_pinus_pond = bw.ppl(pinus_pond_allplots_ppp)
-#bw_likelihood_pinus_albi = bw.ppl(pinus_albi_allplots_ppp)
-#bw_likelihood_tsuga_hete = bw.ppl(tsuga_hete_allplots_ppp)
+#compute optimal bandwith - Diggle and Berman mean sq error cross validation method
+#bw_diggle_plot1 = bw.diggle(seedlings_plot1_ppp)
+#bw_diggle_plot2 = bw.diggle(seedlings_plot2_ppp)
+#bw_diggle_plot3 = bw.diggle(seedlings_plot3_ppp)
+#bw_diggle_allplots = bw.diggle(seedlings_allplots_ppp)
+#plot(bw_diggle_plot1, main="Plot 1 - Diggle & Bearman CV-Bandwidth test")
+#plot(bw_diggle_plot1, main="Plot 1 - Diggle & Bearman CV-Bandwidth test", xlim=c(0,1))
 ```
 
-Kernel density of seedling patterns is modelled using the `epanechnikov` kernel and heat maps. The `epanechnikov` function was chosen over `Gaussian` and `Nadaraya-Watson` functions for its conservative handling of non-negative or outlying estimators and its calculation of MSE (RMSE) or MISE metrics. This is still up for debate. Question: is it worthwhile testing against the others and rejigging the results section?
+Kernel density of seedling patterns is modelled using the `epanechnikov` kernel and heat maps. The `epanechnikov` was chosen over `Gaussian` and `Nadaraya-Watson` kernels in favour of its conservative handling of non-negative, outlying estimators and its option of MSE (and RMSE) over MISE metrics. Though, this still needs some discussion. Question raises, should we be testing others and rejigging the results section? I found scare documentation online comparing these kernels.
 
-```{r}
+```{r, fig.show='hold', out.width='50%', warning=FALSE, message=FALSE}
 #plot 1 - all species pooled - bandwidth=10
 marks(seedlings_plot1_ppp) = NULL
 density_plot1 = density(seedlings_plot1_ppp,
@@ -932,14 +948,25 @@ persp(density_plot3, main="Plot 3")
 
 ### Seedling Clustering
 
-We test for patterns of dispersion and clustering using monte-carlo simulation of complete spatial randomness (CSR), repeated 999 times and fitted with non-linear `Kinhom` kernel. Tests are carried out by plot and by species across all plots.
+We tested for patterns of dispersion and clustering using monte-carlo simulation of complete spatial randomness model (CSR), repeated 999 times and fitted with non-linear `Kinhom` kernel. Non-linear methods were employed after quadrat test, commented out below, showed intensity was non-constant.
 
-Possible question to pursue here, but we have yet to test the CSR of individual species within indivdual plots. See disturbance maps above for reference regarding variance in MPB-fire damage across plots. If needed, we identified the Clark's & Evan's aggregationt test below (1954) that is suitably designed to estimate clustering patterns using Donnely's conservative edge effects constraint (1978) developed for rectangular field plots.
+This is done by species and by plots. Though, we have not tested individual species within indivdual plots. As disturbance maps in section 2.4 above show, there are likely advantages for MPB-hosts in plot 3 where there was no MPB-attacks found. If needed, we saved commands below for the Clark+Evan test of aggregation, which is suitable for its use of Donnelly's edge effects constraint (1978) developed to address long boundaries of rectangular field plot sampling.
 
-~Clark, P.J. and Evans, F.C. (1954) Distance to nearest neighbour as a measure of spatial relationships in populations Ecology 35, 445–453.~
-~Donnelly, K. (1978) Simulations to determine the variance and edge-effect of total nearest neighbour distance. In I. Hodder (ed.) Simulation studies in archaeology, Cambridge/New York: Cambridge University Press, pp 91–95.~
+\~Clark, P.J. and Evans, F.C. (1954) Distance to nearest neighbour as a measure of spatial relationships in populations Ecology 35, 445--453.\~
 
-```{r}
+\~Donnelly, K. (1978) Simulations to determine the variance and edge-effect of total nearest neighbour distance. In I. Hodder (ed.) Simulation studies in archaeology, Cambridge/New York: Cambridge University Press, pp 91--95.\~
+
+```{r, warning=FALSE, message=FALSE}
+# Quadrat test of intensity distribution
+#Quadrat_seedlings_allplots <- quadrat.test(seedlings_allplots_ppp)
+#Quadrat_seedlings_allplots
+#Quadrat_seedlings_plot1 <- quadrat.test(seedlings_plot1_ppp)
+#Quadrat_seedlings_plot1
+#Quadrat_seedlings_plot2 <- quadrat.test(seedlings_plot2_ppp)
+#Quadrat_seedlings_plot2
+#Quadrat_seedlings_plot3 <- quadrat.test(seedlings_plot3_ppp)
+#Quadrat_seedlings_plot3
+
 mcarlo_kinhom999sim_plot1 = envelope(seedlings_plot1_ppp,
                                      Kinhom,
                                      nsim=999,
@@ -1032,13 +1059,13 @@ clarkevans.test(pinus_albi_pooled, nsim = 999)
 clarkevans.test(tsuga_hete_pooled, nsim = 999)
 ```
 
-### Seedling Point Patterns
+### Seedling Point Processes
 
-Covariates are screened as candidate predictors for final inclusion in point-pattern-Cox-process models by Likelihood-Ratio-Test, measuring their odds of prediction against intercept-only model. Similar to glmnet latticed model, first ones out are dropped.
+Covariates are screened as candidate predictors for final inclusion in the point-pattern-Cox-process models using Likelihood-Ratio-Test that measures their odds of prediction against intercept-only model. Similar to glmnet latticed model, first ones out are dropped from the model.
 
-Using the remaining best subset, Cox thomas process models are fitted using `kppm` regression, previously derived optimal bandwidth as spatial threshold, and `isotropic` correction.
+Using the remaining best subset, a Cox-thomas model is fitted using `kppm` regression, with a previously optimized bandwidth as spatial threshold, and `isotropic` correction.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 ppm_allplots = ppm(seedlings_allplots_ppp ~1, correction="isotropic") #intercept only model
 ppm_allplots_distance_tree = ppm(seedlings_allplots_ppp ~ distance_tree_im,correction="isotropic")
 ppm_allplots_elevation = ppm(seedlings_allplots_ppp ~ elevation_im, correction="isotropic")
@@ -1082,13 +1109,17 @@ anova(ppm_allplots, ppm_allplots_fire_low, test = "LRT") #moderately significant
 
 
 
-ppm_seedlings_pooled = kppm(seedlings_pooled ~ distance_tree_im + aspect_class + rix_im + wind_im +
-                                           mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                                         "Thomas", kernel="epanechnikov", correction="isotropic", sigma=bw_likelihood_allplots)
+ppm_seedlings_pooled = kppm(seedlings_pooled ~ distance_tree_im
+                            + aspect_class + rix_im + wind_im +
+                              mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
+                            "Thomas", kernel="epanechnikov", correction="isotropic", 
+                            sigma=bw_likelihood_allplots)
 
-ppm_pinus_con_pooled = kppm(pinus_con_pooled ~ distance_tree_im + aspect_im + rix_im +
-                                                   wind_im + mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                                                 "Thomas", kernel="epanechnikov", correction="isotropic", sigma=bw_likelihood_allplots)
+ppm_pinus_con_pooled = kppm(pinus_con_pooled ~ distance_tree_im + 
+                              aspect_im + rix_im + wind_im + 
+                              mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
+                            "Thomas", kernel="epanechnikov", correction="isotropic", 
+                            sigma=bw_likelihood_allplots)
 
 ppm_larix_spp_pooled = kppm(larix_spp_pooled ~ aspect_log + rix_im +
                                                    wind_im + mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
