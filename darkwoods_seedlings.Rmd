@@ -78,9 +78,7 @@ Seed set to `123` for replication. Import `darkwoods_masterfile` dataset represe
 ```{r, warning=FALSE, message=FALSE}
 set.seed(123) 
 darkwoods_seedlings_data <- read_excel("1.1.darkwoods_masterfile.xlsx")
-darkwoods_seedlings_data %>%
-  flextable() %>%
-    align(j = 2:ncol_keys(.), align = "center")
+kable(head(darkwoods_seedlings_data))
 ```
 
 ```{r,eval=FALSE, warning=FALSE, message=FALSE}
