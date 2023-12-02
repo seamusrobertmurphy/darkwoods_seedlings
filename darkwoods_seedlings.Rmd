@@ -4,12 +4,12 @@ author: "SMurphy"
 date: "2021-01-30"
 output:
   github_document:
-  number_sections: true
-  toc: true
-  toc_depth: 4
+    keep_html: true
 ---
 
-```{r setup, include=FALSE, message = FALSE, warning=FALSE}
+```{r setup, include=FALSE, message = FALSE, warning=FALSE, error=FALSE}
+options(htmltools.dir.version = FALSE, htmltools.preserve.raw = FALSE)
+library(useful)
 library(coefplot)
 library(glmnet)
 library(formatR)
@@ -46,55 +46,68 @@ library(spatstat.data)
 library(spatstat.local)
 library(dplyr)
 library(RColorBrewer)
-
-#library(kableExtra)
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, 
+#install.packages("webshot")
+#webshot::install_phantomjs()
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, error=FALSE,
                       comment = NA,tidy.opts=list(width.cutoff=60),tidy=TRUE)
-options(knitr.table.format = "html") 
 ```
 
 ```{r, eval=FALSE, echo=FALSE}
 #Note: some packages require R-version >4.3 installed 
 #Stage-I dependencies
-install.packages(c("readxl", "sf", "kernlab", "ggplot2", "dplyr", 
-                   "RColorBrewer", "psych", "useful", "caret", 
-                   "tibble", "klaR", "ModelMetrics", "DescTools", 
-                   "MLmetrics", "coefplot", "glmnet", "jsonlite", 
-                   "plotly", "RSQLite", "tidyverse", "useful", "xgboost"), dependencies=TRUE)
+requirements_I = install.packages(c(
+  "readxl", "sf", "kernlab", "ggplot2", "dplyr", 
+  "RColorBrewer", "psych", "useful", "caret", 
+  "tibble", "klaR", "ModelMetrics", "DescTools", 
+  "MLmetrics", "coefplot", "glmnet", "jsonlite", 
+  "plotly", "RSQLite", "tidyverse", "useful", 
+  "xgboost", "webshot", "webshot2"), 
+  dependencies=TRUE)
 
 #Stage-II dependencies
-install.packages(c("spdep", "gstat", "rgdal", "maptools", "raster", 
-                                  "spatstat", "GISTools", "rgeos", "sp", 
-                                  "rpanel", "ncf", "spatial", "spatstat.data", 
-                                  "spatstat.local", "dplyr", "RColorBrewer"), dependencies=TRUE)
+requirements_II = install.packages(c(
+  "spdep", "gstat", "rgdal", "maptools", "raster", 
+  "spatstat", "GISTools", "rgeos", "sp", 
+  "rpanel", "ncf", "spatial", "spatstat.data", 
+  "spatstat.local", "dplyr", "RColorBrewer"), 
+  dependencies=TRUE)
+
+requirements_I
+requirements_II
 ```
 
 ## Stage I: Covariate Selection
 
 ### Import Data+Packages
 
-Seed set to `123` for replication. Import `darkwoods_masterfile` dataset representing covariates and seedling values sampled at stem locations. Package dependencies listed here and silently above in case cloning misses on auto-loading. Care taken as `spatstat` package is the most pernickety. Document package additions in `requirements-I` before pushing to repo with environment commented.
+Seed set to `123` for replication. Import the `1.1.darkwoods_masterfile.xlsx` dataset. This includes seedlings and covariate values previously processed, classified and sampled from stem locations of seedlings using ArcGIS environment.
 
 ```{r, warning=FALSE, message=FALSE}
 set.seed(123) 
-darkwoods_seedlings_data <- read_excel("1.1.darkwoods_masterfile.xlsx")
-kable(head(darkwoods_seedlings_data))
+darkwoods_seedlings_data <- readxl::read_excel("1.1.darkwoods_masterfile.xlsx")
+knitr::kable(head(darkwoods_seedlings_data))
 ```
 
+For local deployment, package dependencies from this iteration are loaded using the `requirements_I` variable.
+
 ```{r,eval=FALSE, warning=FALSE, message=FALSE}
-requirements-I = install.packages(c("readxl", "sf", "kernlab", "ggplot2", "dplyr", 
-                                  "RColorBrewer", "psych", "useful", "caret", 
-                                  "tibble", "klaR", "ModelMetrics", "DescTools", 
-                                  "MLmetrics", "coefplot", "glmnet", "jsonlite", 
-                                  "plotly", "RSQLite", "tidyverse", "useful", "xgboost"), dependencies=TRUE)
-requirements-I # set with 'warnings=FALSE'
+requirements_I = install.packages(c(
+  "readxl", "sf", "kernlab", "ggplot2", "dplyr",
+  "RColorBrewer", "psych", "useful", "caret", 
+  "tibble", "klaR", "ModelMetrics", "DescTools", 
+  "MLmetrics", "coefplot", "glmnet", "jsonlite", 
+  "plotly", "RSQLite", "tidyverse", "useful", "xgboost"),
+  dependencies=TRUE)
+# note warning messages are turned off for this chunk: 'warnings=FALSE'
+
+requirements_I 
 ```
 
 ### Model Fitting
 
 Derive OLS models to explore covariate effects against intercept only models
 
-```{r, fig.show='hold', out.width='33%', warning=FALSE, message=FALSE}
+```{r, fig.show='hold', out.width='50%', warning=FALSE, message=FALSE}
 seed_formula = intensity ~ distance_m + elevation_asl + slope + 
   aspect + rix + twi + wind + mpb_grey + mpb_red + 
   fire_high + fire_med + fire_low - 1 
@@ -128,18 +141,18 @@ seed_formula6.2 = intensity ~ distance_m + elevation_asl + slope +
 allseeds_lm = lm(seed_formula, data=darkwoods_seedlings_data)
 allseeds_lm2 = lm(seed_formula2, data=darkwoods_seedlings_data)
 allseeds_lm3 = lm(seed_formula3, data=darkwoods_seedlings_data)
-allseeds_lm4 = lm(seed_formula4, data=darkwoods_seedlings_data) #best fit model
+allseeds_lm4 = lm(seed_formula4, data=darkwoods_seedlings_data) 
 allseeds_lm5 = lm(seed_formula5, data=darkwoods_seedlings_data)
 allseeds_lm6.1 = lm(seed_formula6.1, data=darkwoods_seedlings_data)
 allseeds_lm6.2 = lm(seed_formula6.2, data=darkwoods_seedlings_data)
 
-coefplot(allseeds_lm, sort='magnitude')
-coefplot(allseeds_lm2, sort='magnitude')
-coefplot(allseeds_lm3, sort='magnitude')
-coefplot(allseeds_lm4, sort='magnitude')
-coefplot(allseeds_lm5, sort='magnitude')
-coefplot(allseeds_lm6.1, sort='magnitude')
-coefplot(allseeds_lm6.2, sort='magnitude')
+coefplot::coefplot(allseeds_lm, sort='magnitude')
+coefplot::coefplot(allseeds_lm2, sort='magnitude')
+coefplot::coefplot(allseeds_lm3, sort='magnitude')
+coefplot::coefplot(allseeds_lm4, sort='magnitude')
+coefplot::coefplot(allseeds_lm5, sort='magnitude')
+coefplot::coefplot(allseeds_lm6.1, sort='magnitude')
+coefplot::coefplot(allseeds_lm6.2, sort='magnitude') #this seems the most interesting model
 ```
 
 ### Model Training
@@ -147,194 +160,85 @@ coefplot(allseeds_lm6.2, sort='magnitude')
 Split into training and test data subset for each model with covariates and repsonse variables mounted.
 
 ```{r, warning=FALSE, message=FALSE}
-allseedsX_train <- build.x(allseeds_lm, data=darkwoods_seedlings_data,
+allseedsX_train <- useful::build.x(allseeds_lm, data=darkwoods_seedlings_data,
                            contrasts = FALSE, sparse = TRUE)
-allseedsY_train <- build.y(allseeds_lm, data=darkwoods_seedlings_data)
+allseedsY_train <- useful::build.y(allseeds_lm, data=darkwoods_seedlings_data)
 
-allseedsX_train2 <- build.x(allseeds_lm2, data=darkwoods_seedlings_data,
+allseedsX_train2 <- useful::build.x(allseeds_lm2, data=darkwoods_seedlings_data,
                            contrasts = FALSE, sparse = TRUE)
-allseedsY_train2 <- build.y(allseeds_lm2, data=darkwoods_seedlings_data)
+allseedsY_train2 <- useful::build.y(allseeds_lm2, data=darkwoods_seedlings_data)
 
-allseedsX_train3 <- build.x(allseeds_lm3, data=darkwoods_seedlings_data,
+allseedsX_train3 <- useful::build.x(allseeds_lm3, data=darkwoods_seedlings_data,
                            contrasts = FALSE, sparse = TRUE)
-allseedsY_train3 <- build.y(allseeds_lm3, data=darkwoods_seedlings_data)
+allseedsY_train3 <- useful::build.y(allseeds_lm3, data=darkwoods_seedlings_data)
 
-allseedsX_train4 <- build.x(allseeds_lm4, data=darkwoods_seedlings_data,
+allseedsX_train4 <- useful::build.x(allseeds_lm4, data=darkwoods_seedlings_data,
                             contrasts = FALSE, sparse = TRUE)
-allseedsY_train4 <- build.y(allseeds_lm4, data=darkwoods_seedlings_data)
+allseedsY_train4 <- useful::build.y(allseeds_lm4, data=darkwoods_seedlings_data)
 
-allseedsX_train5 <- build.x(allseeds_lm5, data=darkwoods_seedlings_data,
+allseedsX_train5 <- useful::build.x(allseeds_lm5, data=darkwoods_seedlings_data,
                             contrasts = FALSE, sparse = TRUE)
-allseedsY_train5 <- build.y(allseeds_lm5, data=darkwoods_seedlings_data)
+allseedsY_train5 <- useful::build.y(allseeds_lm5, data=darkwoods_seedlings_data)
 
-allseedsX_train6.1 <- build.x(allseeds_lm6.1, data=darkwoods_seedlings_data,
+allseedsX_train6.1 <- useful::build.x(allseeds_lm6.1, data=darkwoods_seedlings_data,
                             contrasts = FALSE, sparse = TRUE)
-allseedsY_train6.1 <- build.y(allseeds_lm6.1, data=darkwoods_seedlings_data)
+allseedsY_train6.1 <- useful::build.y(allseeds_lm6.1, data=darkwoods_seedlings_data)
 
-allseedsX_train6.2 <- build.x(allseeds_lm6.2, data=darkwoods_seedlings_data,
+allseedsX_train6.2 <- useful::build.x(allseeds_lm6.2, data=darkwoods_seedlings_data,
                             contrasts = FALSE, sparse = TRUE)
-allseedsY_train6.2 <- build.y(allseeds_lm6.2, data=darkwoods_seedlings_data)
+allseedsY_train6.2 <- useful::build.y(allseeds_lm6.2, data=darkwoods_seedlings_data)
 ```
 
 ### Model Tuning
 
-We run a generalised linear model over an elastic-net (latticed plane) using the `glmnet` package and its `glmnet` kernel to explore data with two varying lambda's; one penalizing and one performance-enhancing lambda's. Below, the `alpha=1` function is used to fit the lasso-model with a lambda that suppresses outliers. Contrastly, the `alpha=0` function fits a ridge-based lambda designed to seek out correlation. Better yet, we can apply the elastic-net function to estimate an optimal lambda as a percentage of alpha between `0` & `1`.
+From the `glmnet` package, covariates are fitted to a generalised linear model over an elastic-net (latticed plane) in order to explore their effects under varying lambdas. The `alpha=1` function is used to fit a lasso-model with a lambda that suppresses outliers, and the `alpha=0` function fits a ridge-based lambda to empower correlation. Adding the `nfolds` function, we apply a 10K-fold cross validation and then compare coeffients visually using the `coefpath` function from the `coefplot` package. Zoom in on graphs to determine the remaining predictors as the model approaches a mean of zero. Most interesting model seems to 6.1.
 
-```{r, fig.show='hold', out.width='25%'}
-allseeds_glmnet_lasso <- glmnet(x=allseedsX_train, y=allseedsY_train, family = 'gaussian', alpha = 1)
-allseeds_glmnet_ridge <- glmnet(x=allseedsX_train, y=allseedsY_train, family = 'gaussian', alpha = 0)
-allseeds_glmnet_lasso2 <- glmnet(x=allseedsX_train2, y=allseedsY_train2, family = 'gaussian', alpha = 1)
-allseeds_glmnet_ridge2 <- glmnet(x=allseedsX_train2, y=allseedsY_train2, family = 'gaussian', alpha = 0)
-allseeds_glmnet_lasso3 <- glmnet(x=allseedsX_train3, y=allseedsY_train3, family = 'gaussian', alpha = 1)
-allseeds_glmnet_ridge3 <- glmnet(x=allseedsX_train3, y=allseedsY_train3, family = 'gaussian', alpha = 0)
-allseeds_glmnet_lasso4 <- glmnet(x=allseedsX_train4, y=allseedsY_train4, family = 'gaussian', alpha = 1)
-allseeds_glmnet_ridge4 <- glmnet(x=allseedsX_train4, y=allseedsY_train4, family = 'gaussian', alpha = 0)
-allseeds_glmnet_lasso5 <- glmnet(x=allseedsX_train5, y=allseedsY_train5, family = 'gaussian', alpha = 1)
-allseeds_glmnet_ridge5 <- glmnet(x=allseedsX_train5, y=allseedsY_train5, family = 'gaussian', alpha = 0)
-allseeds_glmnet_lasso6.1 <- glmnet(x=allseedsX_train6.1, y=allseedsY_train6.1, family = 'gaussian', alpha = 1)
-allseeds_glmnet_ridge6.1 <- glmnet(x=allseedsX_train6.1, y=allseedsY_train6.1, family = 'gaussian', alpha = 0)
-allseeds_glmnet_lasso6.2 <- glmnet(x=allseedsX_train6.2, y=allseedsY_train6.2, family = 'gaussian', alpha = 1)
-allseeds_glmnet_ridge6.2 <- glmnet(x=allseedsX_train6.2, y=allseedsY_train6.2, family = 'gaussian', alpha = 0)
+```{r, fig.show='hold', out.width='100%', warning=FALSE, message=FALSE}
+allseeds_glmnet_lasso_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train, y=allseedsY_train, family='gaussian', alpha=1, nfolds = 10)
+allseeds_glmnet_ridge_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train, y=allseedsY_train, family='gaussian', alpha=0, nfolds = 10)
+allseeds_glmnet_lasso2_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train2, y=allseedsY_train2, family = 'gaussian', alpha = 1, nfolds = 10)
+allseeds_glmnet_ridge2_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train2, y=allseedsY_train2, family = 'gaussian', alpha = 0, nfolds = 10)
+allseeds_glmnet_lasso3_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train3, y=allseedsY_train3, family = 'gaussian', alpha = 1, nfolds = 10)
+allseeds_glmnet_ridge3_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train3, y=allseedsY_train3, family = 'gaussian', alpha = 0, nfolds = 10)
+allseeds_glmnet_lasso4_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train4, y=allseedsY_train4, family = 'gaussian', alpha = 1, nfolds = 10)
+allseeds_glmnet_ridge4_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train4, y=allseedsY_train4, family = 'gaussian', alpha = 0, nfolds = 10)
+allseeds_glmnet_lasso5_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train5, y=allseedsY_train5, family = 'gaussian', alpha = 1, nfolds = 10)
+allseeds_glmnet_ridge5_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train5, y=allseedsY_train5, family = 'gaussian', alpha = 0, nfolds = 10)
+allseeds_glmnet_lasso6.1_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train6.1, y=allseedsY_train6.1, family = 'gaussian', alpha = 1, nfolds = 10)
+allseeds_glmnet_ridge6.1_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train6.1, y=allseedsY_train6.1, family = 'gaussian', alpha = 0, nfolds = 10)
+allseeds_glmnet_lasso6.2_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train6.2, y=allseedsY_train6.2, family = 'gaussian', alpha = 1, nfolds = 10)
+allseeds_glmnet_ridge6.2_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train6.2, y=allseedsY_train6.2, family = 'gaussian', alpha = 0, nfolds = 10)
 
-plot(allseeds_glmnet_lasso)
-plot(allseeds_glmnet_ridge)
-plot(allseeds_glmnet_lasso2)
-plot(allseeds_glmnet_ridge2)
-plot(allseeds_glmnet_lasso3)
-plot(allseeds_glmnet_ridge3)
-plot(allseeds_glmnet_lasso4)
-plot(allseeds_glmnet_ridge4)
-plot(allseeds_glmnet_lasso5)
-plot(allseeds_glmnet_ridge5)
-plot(allseeds_glmnet_lasso6.1)
-plot(allseeds_glmnet_ridge6.1)
-plot(allseeds_glmnet_lasso6.2)
-plot(allseeds_glmnet_ridge6.2)
-```
-
-### Model Validation
-
-Adding the `nfolds` function, we apply a 10K-fold cross validation to measure the generalized and singular effects of covariates. Taken from `coefplot` package, the `coefpath` function produces an interactive graph of covariance and reduced magnitude as the model approaches a mean of zero. Zoom in to distinguish remaining predictors and their coefficients.
-
-```{r, eval=FALSE, warning=FALSE, message=FALSE}
-allseeds_glmnet_lasso_cv_10fold <- cv.glmnet(x=allseedsX_train, y=allseedsY_train, family='gaussian', alpha=1, nfolds = 10)
-allseeds_glmnet_ridge_cv_10fold <- cv.glmnet(x=allseedsX_train, y=allseedsY_train, family='gaussian', alpha=0, nfolds = 10)
-allseeds_glmnet_lasso2_cv_10fold <- glmnet(x=allseedsX_train2, y=allseedsY_train2, family = 'gaussian', alpha = 1, nfolds = 10)
-allseeds_glmnet_ridge2_cv_10fold <- glmnet(x=allseedsX_train2, y=allseedsY_train2, family = 'gaussian', alpha = 0, nfolds = 10)
-allseeds_glmnet_lasso3_cv_10fold <- glmnet(x=allseedsX_train3, y=allseedsY_train3, family = 'gaussian', alpha = 1, nfolds = 10)
-allseeds_glmnet_ridge3_cv_10fold <- glmnet(x=allseedsX_train3, y=allseedsY_train3, family = 'gaussian', alpha = 0, nfolds = 10)
-allseeds_glmnet_lasso4_cv_10fold <- glmnet(x=allseedsX_train4, y=allseedsY_train4, family = 'gaussian', alpha = 1, nfolds = 10)
-allseeds_glmnet_ridge4_cv_10fold <- glmnet(x=allseedsX_train4, y=allseedsY_train4, family = 'gaussian', alpha = 0, nfolds = 10)
-allseeds_glmnet_lasso5_cv_10fold <- glmnet(x=allseedsX_train5, y=allseedsY_train5, family = 'gaussian', alpha = 1, nfolds = 10)
-allseeds_glmnet_ridge5_cv_10fold <- glmnet(x=allseedsX_train5, y=allseedsY_train5, family = 'gaussian', alpha = 0, nfolds = 10)
-allseeds_glmnet_lasso6.1_cv_10fold <- glmnet(x=allseedsX_train6.1, y=allseedsY_train6.1, family = 'gaussian', alpha = 1, nfolds = 10)
-allseeds_glmnet_ridge6.1_cv_10fold <- glmnet(x=allseedsX_train6.1, y=allseedsY_train6.1, family = 'gaussian', alpha = 0, nfolds = 10)
-allseeds_glmnet_lasso6.2_cv_10fold <- glmnet(x=allseedsX_train6.2, y=allseedsY_train6.2, family = 'gaussian', alpha = 1, nfolds = 10)
-allseeds_glmnet_ridge6.2_cv_10fold <- glmnet(x=allseedsX_train6.2, y=allseedsY_train6.2, family = 'gaussian', alpha = 0, nfolds = 10)
-
-plot(allseeds_glmnet_lasso_cv_10fold)
-plot(allseeds_glmnet_lasso_cv_10fold)
-plot(allseeds_glmnet_ridge_cv_10fold)
-plot(allseeds_glmnet_lasso2_cv_10fold)
-plot(allseeds_glmnet_ridge2_cv_10fold)
-plot(allseeds_glmnet_lasso3_cv_10fold)
-plot(allseeds_glmnet_ridge3_cv_10fold)
-plot(allseeds_glmnet_lasso4_cv_10fold)
-plot(allseeds_glmnet_ridge4_cv_10fold)
-plot(allseeds_glmnet_lasso5_cv_10fold)
-plot(allseeds_glmnet_ridge5_cv_10fold)
-plot(allseeds_glmnet_lasso6.1_cv_10fold)
-plot(allseeds_glmnet_ridge6.1_cv_10fold)
 plot(allseeds_glmnet_lasso6.2_cv_10fold)
+coefplot::coefpath(allseeds_glmnet_lasso6.2_cv_10fold)
 plot(allseeds_glmnet_ridge6.2_cv_10fold)
-
-coefpath(allseeds_glmnet_lasso_cv_10fold)
-coefpath(allseeds_glmnet_ridge_cv_10fold)
-coefpath(allseeds_glmnet_lasso2_cv_10fold)
-coefpath(allseeds_glmnet_ridge2_cv_10fold)
-coefpath(allseeds_glmnet_lasso3_cv_10fold)
-coefpath(allseeds_glmnet_ridge3_cv_10fold)
-coefpath(allseeds_glmnet_lasso4_cv_10fold)
-coefpath(allseeds_glmnet_ridge4_cv_10fold)
-coefpath(allseeds_glmnet_lasso5_cv_10fold)
-coefpath(allseeds_glmnet_ridge5_cv_10fold)
-coefpath(allseeds_glmnet_lasso6.1_cv_10fold)
-coefpath(allseeds_glmnet_ridge6.1_cv_10fold)
-coefpath(allseeds_glmnet_lasso6.2_cv_10fold)
-coefpath(allseeds_glmnet_ridge6.2_cv_10fold)
-```
-
-```{r, echo=FALSE, fig.show='hold', out.width='25%', warning=FALSE, message=FALSE}
-allseeds_glmnet_lasso_cv_10fold <- cv.glmnet(x=allseedsX_train, y=allseedsY_train, family='gaussian', alpha=1, nfolds = 10)
-allseeds_glmnet_ridge_cv_10fold <- cv.glmnet(x=allseedsX_train, y=allseedsY_train, family='gaussian', alpha=0, nfolds = 10)
-allseeds_glmnet_lasso2_cv_10fold <- glmnet(x=allseedsX_train2, y=allseedsY_train2, family = 'gaussian', alpha = 1, nfolds = 10)
-allseeds_glmnet_ridge2_cv_10fold <- glmnet(x=allseedsX_train2, y=allseedsY_train2, family = 'gaussian', alpha = 0, nfolds = 10)
-allseeds_glmnet_lasso3_cv_10fold <- glmnet(x=allseedsX_train3, y=allseedsY_train3, family = 'gaussian', alpha = 1, nfolds = 10)
-allseeds_glmnet_ridge3_cv_10fold <- glmnet(x=allseedsX_train3, y=allseedsY_train3, family = 'gaussian', alpha = 0, nfolds = 10)
-allseeds_glmnet_lasso4_cv_10fold <- glmnet(x=allseedsX_train4, y=allseedsY_train4, family = 'gaussian', alpha = 1, nfolds = 10)
-allseeds_glmnet_ridge4_cv_10fold <- glmnet(x=allseedsX_train4, y=allseedsY_train4, family = 'gaussian', alpha = 0, nfolds = 10)
-allseeds_glmnet_lasso5_cv_10fold <- glmnet(x=allseedsX_train5, y=allseedsY_train5, family = 'gaussian', alpha = 1, nfolds = 10)
-allseeds_glmnet_ridge5_cv_10fold <- glmnet(x=allseedsX_train5, y=allseedsY_train5, family = 'gaussian', alpha = 0, nfolds = 10)
-allseeds_glmnet_lasso6.1_cv_10fold <- glmnet(x=allseedsX_train6.1, y=allseedsY_train6.1, family = 'gaussian', alpha = 1, nfolds = 10)
-allseeds_glmnet_ridge6.1_cv_10fold <- glmnet(x=allseedsX_train6.1, y=allseedsY_train6.1, family = 'gaussian', alpha = 0, nfolds = 10)
-allseeds_glmnet_lasso6.2_cv_10fold <- glmnet(x=allseedsX_train6.2, y=allseedsY_train6.2, family = 'gaussian', alpha = 1, nfolds = 10)
-allseeds_glmnet_ridge6.2_cv_10fold <- glmnet(x=allseedsX_train6.2, y=allseedsY_train6.2, family = 'gaussian', alpha = 0, nfolds = 10)
-
-plot(allseeds_glmnet_lasso_cv_10fold)
-plot(allseeds_glmnet_lasso_cv_10fold)
-plot(allseeds_glmnet_ridge_cv_10fold)
-plot(allseeds_glmnet_lasso2_cv_10fold)
-plot(allseeds_glmnet_ridge2_cv_10fold)
-plot(allseeds_glmnet_lasso3_cv_10fold)
-plot(allseeds_glmnet_ridge3_cv_10fold)
-plot(allseeds_glmnet_lasso4_cv_10fold)
-plot(allseeds_glmnet_ridge4_cv_10fold)
-plot(allseeds_glmnet_lasso5_cv_10fold)
-plot(allseeds_glmnet_ridge5_cv_10fold)
-plot(allseeds_glmnet_lasso6.1_cv_10fold)
-plot(allseeds_glmnet_ridge6.1_cv_10fold)
-plot(allseeds_glmnet_lasso6.2_cv_10fold)
-plot(allseeds_glmnet_ridge6.2_cv_10fold)
-```
-
-```{r, echo=FALSE, fig.show='hold', out.width='50%'}
-coefpath(allseeds_glmnet_lasso_cv_10fold)
-#coefpath(allseeds_glmnet_lasso_cv_10fold)
-#coefpath(allseeds_glmnet_ridge_cv_10fold)
-#coefpath(allseeds_glmnet_lasso2_cv_10fold)
-#coefpath(allseeds_glmnet_ridge2_cv_10fold)
-#coefpath(allseeds_glmnet_lasso3_cv_10fold)
-#coefpath(allseeds_glmnet_ridge3_cv_10fold)
-#coefpath(allseeds_glmnet_lasso4_cv_10fold)
-#coefpath(allseeds_glmnet_ridge4_cv_10fold)
-#coefpath(allseeds_glmnet_lasso5_cv_10fold)
-#coefpath(allseeds_glmnet_ridge5_cv_10fold)
-#coefpath(allseeds_glmnet_lasso6.1_cv_10fold)
-#coefpath(allseeds_glmnet_ridge6.1_cv_10fold)
-#coefpath(allseeds_glmnet_lasso6.2_cv_10fold)
-#coefpath(allseeds_glmnet_ridge6.2_cv_10fold)
+coefplot::coefpath(allseeds_glmnet_ridge6.2_cv_10fold)
 ```
 
 ## Stage II: Spatial Point Process Modelling
 
 ### Import Data+Packages
 
-Import masterfile dataset `darkwoods_seedlings_data` which includes covariates values sampled, processed and classified from stem location of seedlings. The `spatstat` point process models also require spatial covariates as image files in `.im` format, that are converted below from raster and shapefile/GPS objects. This includes a seperate csv/xlsx dataset showing distance to nearest living seed source that is marked for cross-reference with same #ID number as seedling observations in the master dataset, as well raster stack of terrain, climate, and disurbance layers.
+In this section, we use three separate datasets. One is already loaded from excel masterfile above. Two are imported in excel and raster formats and renamed below. Separate datasets of specific formats are required by the `spatstat` package depending on spatial modelling operations, including conversion of covariates into `.img` image files in the code chunk after this.
+
+1.  `darkwoods_seedlings_data` - already loaded excel file from above,
+2.  `darkwoods_seedlings_tree_distance` - excel file showing seed-distance,
+3.  Rasters x 11 showing terrain, climate, and disturbance covariates.
+
+Package requirements for stage-II listed below.
 
 ```{r, eval=FALSE, warning=FALSE, message=FALSE}
-requirements-II = install.packages(c("spdep", "gstat", "rgdal", "maptools", "raster", 
+requirements_II = install.packages(c("spdep", "gstat", "rgdal", "maptools", "raster", 
                                   "spatstat", "GISTools", "rgeos", "sp", 
                                   "rpanel", "ncf", "spatial", "spatstat.data", 
                                   "spatstat.local", "dplyr", "RColorBrewer", "jsonlite", 
                                   "plotly", "RSQLite", "tidyverse", "useful", "xgboost"), dependencies=TRUE)
-requirements-II # settings on 'warnings=FALSE'
+requirements_II # settings on 'warnings=FALSE'
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 darkwoods_seedlings_tree_distance = read_excel("1.2.darkwoods_seedlings_distance.xls")
-darkwoods_seedlings_tree_distance %>%
-  flextable() %>%
-    align(j = 2:ncol_keys(.), align = "center")
+knitr::kable(head(darkwoods_seedlings_tree_distance))
 
 elevation_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/elevation_utm.tif"))
 aspect_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/aspect_utm.tif"))
@@ -351,14 +255,14 @@ fire_low_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialDa
 
 ### Tidy Data
 
-Convert dataset into `sf` simple features, `sp` spatial objects, and `ppp` point process predictors. `ppp` objects are dependent on this conversion flow. For cross-plot analysis, `ppp` subsamples are then re-pooled using ratio-estimation function `superimpose`
+Convert datasets of seedlings and seed-distance from `sf` simple feature objects, to `sp` spatial objects, to `ppp` point pattern process objects. This is the required conversion flow for `ppp` objects. Then convert covariate rasters and seed-distance from `ppp` objects to `.img` image objects. Make sure to complete all transformations and data cleaning at the 'sf' stage.
 
-At `sf` stage, prior to last two conversions, transform covariates into factors and numerics for geospatial operations and `spatstat` requirements, tidy labelling, and process out any voids or outliers.
-
-The project's geo-projection protocol is defined by the `crsProject` variable below and set to `EPSG:32611`. This is still up for debate. Question, is it arguably better practice to project everything to the LiDAR's *original* coordinate system than to reproject everything to Landsat's *official* projection? This is assuming that LiDAR is always king in terms of georeferencing accuracy, thougb our most important predictors are Landsat-derived. Note, field equipment used in ground sampling was calibrated to `EPSG:3005`.
+The `crsProject` variable sets projections to `EPSG:32611`. Question, is it better practice to reproject everything to the LiDAR's *original* coordinate system than to reproject everything to Landsat's *official* projection? Although our higher-resolution LiDAR is superior in terms of georeferencing accuracy, most important predictors are Landsat-derived. Additionally, field equipment was calibrated to `EPSG:3005`.
 
 ```{r, warning=FALSE, message=FALSE}
+# Project crs projection 
 crsProject = st_crs("EPSG:32611")
+# Convert to sf
 seedlings_allplots_sf = st_as_sf(darkwoods_seedlings_data, 
                                  coords = c("x", "y"), 
                                  crs = crsProject)
@@ -367,6 +271,7 @@ distance_tree = st_as_sf(darkwoods_seedlings_tree_distance,
                          coords = c("x", "y"),
                          crs = crsProject)
 
+# Factorise and relabel
 seedlings_allplots_sf$plot1 = factor(seedlings_allplots_sf$plot1)
 seedlings_allplots_sf$plot2 = factor(seedlings_allplots_sf$plot2)
 seedlings_allplots_sf$plot3 = factor(seedlings_allplots_sf$plot3)
@@ -382,204 +287,14 @@ seedlings_allplots_sf$species <- factor(seedlings_allplots_sf$species,
                                               "Pinus monticola",
                                               "Tsuga heterophylla"))
 
-# All species across and within plots
+# Convert sf to sp to ppp pbjects 
 seedlings_allplots_sp = as(seedlings_allplots_sf, "Spatial")
 seedlings_allplots_ppp = as(seedlings_allplots_sp, "ppp")
-seedlings_plot1_sp = subset(seedlings_allplots_sp,plot1==1)
-seedlings_plot2_sp = subset(seedlings_allplots_sp,plot2==1)
-seedlings_plot3_sp = subset(seedlings_allplots_sp,plot3==1)
-seedlings_plot1_ppp = subset(seedlings_allplots_ppp,plot1==1)
-seedlings_plot2_ppp = subset(seedlings_allplots_ppp,plot2==1)
-seedlings_plot3_ppp = subset(seedlings_allplots_ppp,plot3==1)
 
-# All plots by species
-larix_spp_allplots_sp = subset(seedlings_allplots_sp,larix_spp==1)
-pseudo_m_allplots_sp = subset(seedlings_allplots_sp, pseudo_m==1)
-picea_eng_allplots_sp = subset(seedlings_allplots_sp, picea_eng==1)
-pinus_con_allplots_sp = subset(seedlings_allplots_sp, pinus_con==1)
-pinus_pond_allplots_sp = subset(seedlings_allplots_sp, pinus_pond==1)
-pinus_albi_allplots_sp = subset(seedlings_allplots_sp, pinus_albi==1)
-tsuga_hete_allplots_sp = subset(seedlings_allplots_sp, tsuga_hete==1)
-larix_spp_allplots_ppp = subset(seedlings_allplots_ppp,larix_spp==1)
-pseudo_m_allplots_ppp = subset(seedlings_allplots_ppp, pseudo_m==1)
-picea_eng_allplots_ppp = subset(seedlings_allplots_ppp, picea_eng==1)
-pinus_con_allplots_ppp = subset(seedlings_allplots_ppp, pinus_con==1)
-pinus_pond_allplots_ppp = subset(seedlings_allplots_ppp, pinus_pond==1)
-pinus_albi_allplots_ppp = subset(seedlings_allplots_ppp, pinus_albi==1)
-tsuga_hete_allplots_ppp = subset(seedlings_allplots_ppp, tsuga_hete==1)
-
-# Plot 1 by species
-larix_spp_plot1_sp = subset(seedlings_plot1_sp, larix_spp==1)
-pseudo_m_plot1_sp = subset(seedlings_plot1_sp, pseudo_m==1)
-picea_eng_plot1_sp = subset(seedlings_plot1_sp, picea_eng==1)
-pinus_con_plot1_sp = subset(seedlings_plot1_sp, pinus_con==1)
-pinus_pond_plot1_sp = subset(seedlings_plot1_sp, pinus_pond==1)
-pinus_albi_plot1_sp = subset(seedlings_plot1_sp, pinus_albi==1)
-tsuga_hete_plot1_sp = subset(seedlings_plot1_sp, tsuga_hete==1)
-larix_spp_plot1_ppp = subset(seedlings_plot1_ppp, larix_spp==1)
-pseudo_m_plot1_ppp = subset(seedlings_plot1_ppp, pseudo_m==1)
-picea_eng_plot1_ppp = subset(seedlings_plot1_ppp, picea_eng==1)
-pinus_con_plot1_ppp = subset(seedlings_plot1_ppp, pinus_con==1)
-pinus_pond_plot1_ppp = subset(seedlings_plot1_ppp, pinus_pond==1)
-pinus_albi_plot1_ppp = subset(seedlings_plot1_ppp, pinus_albi==1)
-tsuga_hete_plot1_ppp = subset(seedlings_plot1_ppp, tsuga_hete==1)
-
-# Plot 2 by species
-larix_spp_plot2_sp = subset(seedlings_plot2_sp, larix_spp==1)
-pseudo_m_plot2_sp = subset(seedlings_plot2_sp, pseudo_m==1)
-picea_eng_plot2_sp = subset(seedlings_plot2_sp, picea_eng==1)
-pinus_con_plot2_sp = subset(seedlings_plot2_sp, pinus_con==1)
-pinus_pond_plot2_sp = subset(seedlings_plot2_sp, pinus_pond==1)
-pinus_albi_plot2_sp = subset(seedlings_plot2_sp, pinus_albi==1)
-tsuga_hete_plot2_sp = subset(seedlings_plot2_sp, tsuga_hete==1)
-larix_spp_plot2_ppp = subset(seedlings_plot2_ppp, larix_spp==1)
-pseudo_m_plot2_ppp = subset(seedlings_plot2_ppp, pseudo_m==1)
-picea_eng_plot2_ppp = subset(seedlings_plot2_ppp, picea_eng==1)
-pinus_con_plot2_ppp = subset(seedlings_plot2_ppp, pinus_con==1)
-pinus_pond_plot2_ppp = subset(seedlings_plot2_ppp, pinus_pond==1)
-pinus_albi_plot2_ppp = subset(seedlings_plot2_ppp, pinus_albi==1)
-tsuga_hete_plot2_ppp = subset(seedlings_plot2_ppp, tsuga_hete==1)
-
-# Plot 3 by species
-larix_spp_plot3_sp = subset(seedlings_plot3_sp, larix_spp==1)
-pseudo_m_plot3_sp = subset(seedlings_plot3_sp, pseudo_m==1)
-picea_eng_plot3_sp = subset(seedlings_plot3_sp, picea_eng==1)
-pinus_con_plot3_sp = subset(seedlings_plot3_sp, pinus_con==1)
-pinus_pond_plot3_sp = subset(seedlings_plot3_sp, pinus_pond==1)
-pinus_albi_plot3_sp = subset(seedlings_plot3_sp, pinus_albi==1)
-tsuga_hete_plot3_sp = subset(seedlings_plot3_sp, tsuga_hete==1)
-larix_spp_plot3_ppp = subset(seedlings_plot3_ppp, larix_spp==1)
-pseudo_m_plot3_ppp = subset(seedlings_plot3_ppp, pseudo_m==1)
-picea_eng_plot3_ppp = subset(seedlings_plot3_ppp, picea_eng==1)
-pinus_con_plot3_ppp = subset(seedlings_plot3_ppp, pinus_con==1)
-pinus_pond_plot3_ppp = subset(seedlings_plot3_ppp, pinus_pond==1)
-pinus_albi_plot3_ppp = subset(seedlings_plot3_ppp, pinus_albi==1)
-tsuga_hete_plot3_ppp = subset(seedlings_plot3_ppp, tsuga_hete==1)
-
-# All plots by species pooled by ratio-estimation
-seedlings_pooled = superimpose(seedlings_plot1_ppp, seedlings_plot2_ppp , seedlings_plot3_ppp)
-pinus_con_pooled = superimpose(pinus_con_plot1_ppp, pinus_con_plot2_ppp, pinus_con_plot3_ppp)
-larix_spp_pooled = superimpose(larix_spp_plot1_ppp, larix_spp_plot2_ppp, larix_spp_plot3_ppp)
-picea_eng_pooled = superimpose(picea_eng_plot1_ppp, picea_eng_plot2_ppp, picea_eng_plot3_ppp)
-pseudo_m_pooled = superimpose(pseudo_m_plot1_ppp, pseudo_m_plot2_ppp, pseudo_m_plot3_ppp)
-pinus_pond_pooled = superimpose(pinus_pond_plot1_ppp, pinus_pond_plot2_ppp, pinus_pond_plot3_ppp)
-pinus_albi_pooled = superimpose(pinus_albi_plot1_ppp, pinus_albi_plot2_ppp, pinus_albi_plot3_ppp)
-tsuga_hete_pooled = superimpose(tsuga_hete_plot1_ppp, tsuga_hete_plot2_ppp, tsuga_hete_plot3_ppp)
-```
-
-Import-tidy shapefiles of seedling plots to derive observational windows
-
-```{r, warning=FALSE, message=FALSE}
-read_excel("1.1.darkwoods_masterfile.xlsx")
-mask_plot1 = readOGR(dsn = "~/Desktop/git_repos/darkwoods_seedlings/plots123.shps/", layer="plot1X")
-mask_plot2 = readOGR(dsn = "~/Desktop/git_repos/darkwoods_seedlings/plots123.shps/", layer="plot2X")
-mask_plot3 = readOGR(dsn = "~/Desktop/git_repos/darkwoods_seedlings/plots123.shps/", layer="plot3X")
-mask_allplots = readOGR(dsn = "~/Desktop/git_repos/darkwoods_seedlings/plots123.shps/", layer="plots123")
-#check coordinate reference system
-#crs(mask_plot1)
-#crs(mask_plot2)
-#crs(mask_plot3)
-#crs(mask_allplots)
-#assign coordinate reference system to 'sp' objects
-#crs(mask_plot1) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
-#crs(mask_plot2) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
-#crs(mask_plot3) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
-#crs(mask_allplots) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
-#Derive observational windows
-win_plot1 = as.owin(mask_plot1, unitname="meters")
-win_plot2 = as.owin(mask_plot2, unitname="meters")
-win_plot3 = as.owin(mask_plot3, unitname="meters")
-win_allplots = as.owin(mask_allplots, unitname="meters")
-
-#assign observational windows to ppp data
-Window(seedlings_plot1_ppp)=win_plot1
-Window(seedlings_plot2_ppp)=win_plot2
-Window(seedlings_plot3_ppp)=win_plot3
-Window(seedlings_allplots_ppp)=win_allplots
-
-Window(larix_spp_allplots_ppp)=win_allplots
-Window(pseudo_m_allplots_ppp)=win_allplots
-Window(picea_eng_allplots_ppp)=win_allplots
-Window(pinus_con_allplots_ppp)=win_allplots
-Window(pinus_pond_allplots_ppp)=win_allplots
-Window(pinus_albi_allplots_ppp)=win_allplots
-Window(tsuga_hete_allplots_ppp)=win_allplots
-
-Window(larix_spp_plot1_ppp)=win_plot1
-Window(pseudo_m_plot1_ppp)=win_plot1
-Window(picea_eng_plot1_ppp)=win_plot1
-Window(pinus_con_plot1_ppp)=win_plot1
-Window(pinus_pond_plot1_ppp)=win_plot1
-Window(pinus_albi_plot1_ppp)=win_plot1
-Window(tsuga_hete_plot1_ppp)=win_plot1
-
-Window(larix_spp_plot2_ppp)=win_plot2
-Window(pseudo_m_plot2_ppp)=win_plot2
-Window(picea_eng_plot2_ppp)=win_plot2
-Window(pinus_con_plot2_ppp)=win_plot2
-Window(pinus_pond_plot2_ppp)=win_plot2
-Window(pinus_albi_plot2_ppp)=win_plot2
-Window(tsuga_hete_plot2_ppp)=win_plot2
-
-Window(larix_spp_plot3_ppp)=win_plot3
-Window(pseudo_m_plot3_ppp)=win_plot3
-Window(picea_eng_plot3_ppp)=win_plot3
-Window(pinus_con_plot3_ppp)=win_plot3
-Window(pinus_pond_plot3_ppp)=win_plot3
-Window(pinus_albi_plot3_ppp)=win_plot3
-Window(tsuga_hete_plot3_ppp)=win_plot3
-
-#assign unit of division is set to meters
-unitname(larix_spp_allplots_ppp)=c("meter", "meter")
-unitname(pseudo_m_allplots_ppp)=c("meter", "meter")
-unitname(picea_eng_allplots_ppp)=c("meter", "meter")
-unitname(pinus_con_allplots_ppp)=c("meter", "meter")
-unitname(pinus_pond_allplots_ppp)=c("meter", "meter")
-unitname(pinus_albi_allplots_ppp)=c("meter", "meter")
-unitname(tsuga_hete_allplots_ppp)=c("meter", "meter")
-
-unitname(larix_spp_plot1_ppp)=c("meter", "meter")
-unitname(pseudo_m_plot1_ppp)=c("meter", "meter")
-unitname(picea_eng_plot1_ppp)=c("meter", "meter")
-unitname(pinus_con_plot1_ppp)=c("meter", "meter")
-unitname(pinus_pond_plot1_ppp)=c("meter", "meter")
-unitname(pinus_albi_plot1_ppp)=c("meter", "meter")
-unitname(tsuga_hete_plot1_ppp)=c("meter", "meter")
-
-unitname(larix_spp_plot2_ppp)=c("meter", "meter")
-unitname(pseudo_m_plot2_ppp)=c("meter", "meter")
-unitname(picea_eng_plot2_ppp)=c("meter", "meter")
-unitname(pinus_con_plot2_ppp)=c("meter", "meter")
-unitname(pinus_pond_plot2_ppp)=c("meter", "meter")
-unitname(pinus_albi_plot2_ppp)=c("meter", "meter")
-unitname(tsuga_hete_plot2_ppp)=c("meter", "meter")
-
-unitname(larix_spp_plot3_ppp)=c("meter", "meter")
-unitname(pseudo_m_plot3_ppp)=c("meter", "meter")
-unitname(picea_eng_plot3_ppp)=c("meter", "meter")
-unitname(pinus_con_plot3_ppp)=c("meter", "meter")
-unitname(pinus_pond_plot3_ppp)=c("meter", "meter")
-unitname(pinus_albi_plot3_ppp)=c("meter", "meter")
-unitname(tsuga_hete_plot3_ppp)=c("meter", "meter")
-
-#unmark data points OR...
-marks(seedlings_plot1_ppp) <- NULL
-marks(seedlings_plot2_ppp) <- NULL
-marks(seedlings_plot3_ppp) <- NULL
-marks(seedlings_allplots_ppp) <- NULL
-
-#mark data points by species
-marks(seedlings_plot1_ppp) <- seedlings_plot1_ppp$species
-marks(seedlings_plot2_ppp) <- seedlings_plot2_ppp$species
-marks(seedlings_plot3_ppp) <- seedlings_plot3_ppp$species
-marks(seedlings_allplots_ppp) <- seedlings_allplots_ppp$species
-
-# Distance to seed source
 distance_tree_sp = as(distance_tree, "Spatial")
 distance_tree_ppp = as(distance_tree_sp, "ppp")
 distance_tree_im = as.im.ppp(distance_tree_ppp)
 
-#convert to image file for analysis in spatstat package
 elevation_im = as.im(elevation_utm)
 aspect_im = as.im.RasterLayer(aspect_utm)
 slope_im = as.im.RasterLayer(slope_utm)
@@ -591,19 +306,192 @@ mpb_red_im = as.im.RasterLayer(mpb_red_utm)
 fire_high_im = as.im.RasterLayer(fire_high_utm)
 fire_med_im = as.im.RasterLayer(fire_med_utm)
 fire_low_im = as.im.RasterLayer(fire_low_utm)
+```
 
-#check normality of distribution
-hist(elevation_im, las=1)
-hist(aspect_im, las=1)
-hist(slope_im, las=1)
-hist(rix_im, las=1)
-hist(twi_im, las=1)
-hist(wind_im, las=1)
-hist(mpb_grey_im, las=1)
-hist(mpb_red_im, las=1)
-hist(fire_high_im, las=1)
-hist(fire_med_im, las=1)
-hist(fire_low_im, las=1)
+Subset seedlings by plot and by species at the `sp` and `ppp` stages to enable plotting and model fitting. For global analysis, plot subsamples are pooled using ratio-estimation function: `superimpose`
+
+```{r, message=FALSE, warning=FALSE}
+seedlings_plot1_sp = subset(seedlings_allplots_sp,plot1==1)
+seedlings_plot2_sp = subset(seedlings_allplots_sp,plot2==1)
+seedlings_plot3_sp = subset(seedlings_allplots_sp,plot3==1)
+seedlings_plot1_ppp = subset(seedlings_allplots_ppp,plot1==1)
+seedlings_plot2_ppp = subset(seedlings_allplots_ppp,plot2==1)
+seedlings_plot3_ppp = subset(seedlings_allplots_ppp,plot3==1)
+
+larix_spp_allplots_sp = subset(seedlings_allplots_sp,larix_spp==1)
+pseudo_m_allplots_sp = subset(seedlings_allplots_sp, pseudo_m==1)
+picea_eng_allplots_sp = subset(seedlings_allplots_sp, picea_eng==1)
+pinus_con_allplots_sp = subset(seedlings_allplots_sp, pinus_con==1)
+pinus_pond_allplots_sp = subset(seedlings_allplots_sp, pinus_pond==1)
+pinus_monti_allplots_sp = subset(seedlings_allplots_sp, pinus_albi==1)
+tsuga_hete_allplots_sp = subset(seedlings_allplots_sp, tsuga_hete==1)
+larix_spp_allplots_ppp = subset(seedlings_allplots_ppp,larix_spp==1)
+pseudo_m_allplots_ppp = subset(seedlings_allplots_ppp, pseudo_m==1)
+picea_eng_allplots_ppp = subset(seedlings_allplots_ppp, picea_eng==1)
+pinus_con_allplots_ppp = subset(seedlings_allplots_ppp, pinus_con==1)
+pinus_pond_allplots_ppp = subset(seedlings_allplots_ppp, pinus_pond==1)
+pinus_monti_allplots_ppp = subset(seedlings_allplots_ppp, pinus_albi==1)
+tsuga_hete_allplots_ppp = subset(seedlings_allplots_ppp, tsuga_hete==1)
+
+# Plot 1 by species
+larix_spp_plot1_sp = subset(seedlings_plot1_sp, larix_spp==1)
+pseudo_m_plot1_sp = subset(seedlings_plot1_sp, pseudo_m==1)
+picea_eng_plot1_sp = subset(seedlings_plot1_sp, picea_eng==1)
+pinus_con_plot1_sp = subset(seedlings_plot1_sp, pinus_con==1)
+pinus_pond_plot1_sp = subset(seedlings_plot1_sp, pinus_pond==1)
+pinus_monti_plot1_sp = subset(seedlings_plot1_sp, pinus_albi==1)
+tsuga_hete_plot1_sp = subset(seedlings_plot1_sp, tsuga_hete==1)
+larix_spp_plot1_ppp = subset(seedlings_plot1_ppp, larix_spp==1)
+pseudo_m_plot1_ppp = subset(seedlings_plot1_ppp, pseudo_m==1)
+picea_eng_plot1_ppp = subset(seedlings_plot1_ppp, picea_eng==1)
+pinus_con_plot1_ppp = subset(seedlings_plot1_ppp, pinus_con==1)
+pinus_pond_plot1_ppp = subset(seedlings_plot1_ppp, pinus_pond==1)
+pinus_monti_plot1_ppp = subset(seedlings_plot1_ppp, pinus_albi==1)
+tsuga_hete_plot1_ppp = subset(seedlings_plot1_ppp, tsuga_hete==1)
+
+# Plot 2 by species
+larix_spp_plot2_sp = subset(seedlings_plot2_sp, larix_spp==1)
+pseudo_m_plot2_sp = subset(seedlings_plot2_sp, pseudo_m==1)
+picea_eng_plot2_sp = subset(seedlings_plot2_sp, picea_eng==1)
+pinus_con_plot2_sp = subset(seedlings_plot2_sp, pinus_con==1)
+pinus_pond_plot2_sp = subset(seedlings_plot2_sp, pinus_pond==1)
+pinus_monti_plot2_sp = subset(seedlings_plot2_sp, pinus_albi==1)
+tsuga_hete_plot2_sp = subset(seedlings_plot2_sp, tsuga_hete==1)
+larix_spp_plot2_ppp = subset(seedlings_plot2_ppp, larix_spp==1)
+pseudo_m_plot2_ppp = subset(seedlings_plot2_ppp, pseudo_m==1)
+picea_eng_plot2_ppp = subset(seedlings_plot2_ppp, picea_eng==1)
+pinus_con_plot2_ppp = subset(seedlings_plot2_ppp, pinus_con==1)
+pinus_pond_plot2_ppp = subset(seedlings_plot2_ppp, pinus_pond==1)
+pinus_monti_plot2_ppp = subset(seedlings_plot2_ppp, pinus_albi==1)
+tsuga_hete_plot2_ppp = subset(seedlings_plot2_ppp, tsuga_hete==1)
+
+# Plot 3 by species
+larix_spp_plot3_sp = subset(seedlings_plot3_sp, larix_spp==1)
+pseudo_m_plot3_sp = subset(seedlings_plot3_sp, pseudo_m==1)
+picea_eng_plot3_sp = subset(seedlings_plot3_sp, picea_eng==1)
+pinus_con_plot3_sp = subset(seedlings_plot3_sp, pinus_con==1)
+pinus_pond_plot3_sp = subset(seedlings_plot3_sp, pinus_pond==1)
+pinus_monti_plot3_sp = subset(seedlings_plot3_sp, pinus_albi==1)
+tsuga_hete_plot3_sp = subset(seedlings_plot3_sp, tsuga_hete==1)
+larix_spp_plot3_ppp = subset(seedlings_plot3_ppp, larix_spp==1)
+pseudo_m_plot3_ppp = subset(seedlings_plot3_ppp, pseudo_m==1)
+picea_eng_plot3_ppp = subset(seedlings_plot3_ppp, picea_eng==1)
+pinus_con_plot3_ppp = subset(seedlings_plot3_ppp, pinus_con==1)
+pinus_pond_plot3_ppp = subset(seedlings_plot3_ppp, pinus_pond==1)
+pinus_monti_plot3_ppp = subset(seedlings_plot3_ppp, pinus_albi==1)
+tsuga_hete_plot3_ppp = subset(seedlings_plot3_ppp, tsuga_hete==1)
+
+# All plots by species pooled by ratio-estimation
+seedlings_pooled = superimpose(seedlings_plot1_ppp, seedlings_plot2_ppp , seedlings_plot3_ppp)
+pinus_con_pooled = superimpose(pinus_con_plot1_ppp, pinus_con_plot2_ppp, pinus_con_plot3_ppp)
+larix_spp_pooled = superimpose(larix_spp_plot1_ppp, larix_spp_plot2_ppp, larix_spp_plot3_ppp)
+picea_eng_pooled = superimpose(picea_eng_plot1_ppp, picea_eng_plot2_ppp, picea_eng_plot3_ppp)
+pseudo_m_pooled = superimpose(pseudo_m_plot1_ppp, pseudo_m_plot2_ppp, pseudo_m_plot3_ppp)
+pinus_pond_pooled = superimpose(pinus_pond_plot1_ppp, pinus_pond_plot2_ppp, pinus_pond_plot3_ppp)
+pinus_monti_pooled = superimpose(pinus_monti_plot1_ppp, pinus_monti_plot2_ppp, pinus_monti_plot1_ppp)
+tsuga_hete_pooled = superimpose(tsuga_hete_plot1_ppp, tsuga_hete_plot2_ppp, tsuga_hete_plot3_ppp)
+```
+
+Import and tidy shapefiles of seedling plot boundaries to derive and assign observational windows to point pattern objects. Depending on `spatstat` operation, `ppp` objects must be marked or unmarked using the `marks` function, see bottom of chunk below.
+
+```{r, warning=FALSE, message=FALSE}
+mask_plot1 = readOGR(dsn = "~/Desktop/git_repos/darkwoods_seedlings/plots123.shps/", layer="plot1X", verbose = FALSE)
+mask_plot2 = readOGR(dsn = "~/Desktop/git_repos/darkwoods_seedlings/plots123.shps/", layer="plot2X", verbose = FALSE)
+mask_plot3 = readOGR(dsn = "~/Desktop/git_repos/darkwoods_seedlings/plots123.shps/", layer="plot3X", verbose = FALSE)
+mask_allplots = readOGR(dsn = "~/Desktop/git_repos/darkwoods_seedlings/plots123.shps/", layer="plots123", verbose = FALSE)
+
+#check OR assign coordinate reference systems
+#crs(mask_plot1)
+#crs(mask_plot2)
+#crs(mask_plot3)
+#crs(mask_allplots)
+
+#crs(mask_plot1) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
+#crs(mask_plot2) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
+#crs(mask_plot3) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
+#crs(mask_allplots) <- "+proj=utm +zone=11 +datum=WGS84 +units=m +no_defs"
+
+#derive observational windows
+win_plot1 = as.owin(mask_plot1, unitname="meters")
+win_plot2 = as.owin(mask_plot2, unitname="meters")
+win_plot3 = as.owin(mask_plot3, unitname="meters")
+win_allplots = as.owin(mask_allplots, unitname="meters")
+
+#assign observational windows
+Window(seedlings_plot1_ppp)=win_plot1
+Window(seedlings_plot2_ppp)=win_plot2
+Window(seedlings_plot3_ppp)=win_plot3
+Window(seedlings_allplots_ppp)=win_allplots
+
+Window(larix_spp_allplots_ppp)=win_allplots
+Window(pseudo_m_allplots_ppp)=win_allplots
+Window(picea_eng_allplots_ppp)=win_allplots
+Window(pinus_con_allplots_ppp)=win_allplots
+Window(pinus_pond_allplots_ppp)=win_allplots
+Window(pinus_monti_allplots_ppp)=win_allplots
+Window(tsuga_hete_allplots_ppp)=win_allplots
+
+Window(larix_spp_plot1_ppp)=win_plot1
+Window(pseudo_m_plot1_ppp)=win_plot1
+Window(picea_eng_plot1_ppp)=win_plot1
+Window(pinus_con_plot1_ppp)=win_plot1
+Window(pinus_pond_plot1_ppp)=win_plot1
+Window(pinus_monti_plot1_ppp)=win_plot1
+Window(tsuga_hete_plot1_ppp)=win_plot1
+
+Window(larix_spp_plot2_ppp)=win_plot2
+Window(pseudo_m_plot2_ppp)=win_plot2
+Window(picea_eng_plot2_ppp)=win_plot2
+Window(pinus_con_plot2_ppp)=win_plot2
+Window(pinus_pond_plot2_ppp)=win_plot2
+Window(pinus_monti_plot2_ppp)=win_plot2
+Window(tsuga_hete_plot2_ppp)=win_plot2
+
+Window(larix_spp_plot3_ppp)=win_plot3
+Window(pseudo_m_plot3_ppp)=win_plot3
+Window(picea_eng_plot3_ppp)=win_plot3
+Window(pinus_con_plot3_ppp)=win_plot3
+Window(pinus_pond_plot3_ppp)=win_plot3
+Window(pinus_monti_plot3_ppp)=win_plot3
+Window(tsuga_hete_plot3_ppp)=win_plot3
+
+#assign unit of division is set to meters
+unitname(larix_spp_allplots_ppp)=c("meter", "meter")
+unitname(pseudo_m_allplots_ppp)=c("meter", "meter")
+unitname(picea_eng_allplots_ppp)=c("meter", "meter")
+unitname(pinus_con_allplots_ppp)=c("meter", "meter")
+unitname(pinus_pond_allplots_ppp)=c("meter", "meter")
+unitname(pinus_monti_allplots_ppp)=c("meter", "meter")
+unitname(tsuga_hete_allplots_ppp)=c("meter", "meter")
+
+unitname(larix_spp_plot1_ppp)=c("meter", "meter")
+unitname(pseudo_m_plot1_ppp)=c("meter", "meter")
+unitname(picea_eng_plot1_ppp)=c("meter", "meter")
+unitname(pinus_con_plot1_ppp)=c("meter", "meter")
+unitname(pinus_pond_plot1_ppp)=c("meter", "meter")
+unitname(pinus_monti_plot1_ppp)=c("meter", "meter")
+unitname(tsuga_hete_plot1_ppp)=c("meter", "meter")
+
+unitname(larix_spp_plot2_ppp)=c("meter", "meter")
+unitname(pseudo_m_plot2_ppp)=c("meter", "meter")
+unitname(picea_eng_plot2_ppp)=c("meter", "meter")
+unitname(pinus_con_plot2_ppp)=c("meter", "meter")
+unitname(pinus_pond_plot2_ppp)=c("meter", "meter")
+unitname(pinus_monti_plot2_ppp)=c("meter", "meter")
+unitname(tsuga_hete_plot2_ppp)=c("meter", "meter")
+
+unitname(larix_spp_plot3_ppp)=c("meter", "meter")
+unitname(pseudo_m_plot3_ppp)=c("meter", "meter")
+unitname(picea_eng_plot3_ppp)=c("meter", "meter")
+unitname(pinus_con_plot3_ppp)=c("meter", "meter")
+unitname(pinus_pond_plot3_ppp)=c("meter", "meter")
+unitname(pinus_monti_plot3_ppp)=c("meter", "meter")
+unitname(tsuga_hete_plot3_ppp)=c("meter", "meter")
+
+marks(seedlings_plot1_ppp) <- seedlings_plot1_ppp$species
+marks(seedlings_plot2_ppp) <- seedlings_plot2_ppp$species
+marks(seedlings_plot3_ppp) <- seedlings_plot3_ppp$species
+marks(seedlings_allplots_ppp) <- seedlings_allplots_ppp$species
 ```
 
 ### Seedling Maps
@@ -615,7 +503,7 @@ points(larix_spp_plot1_ppp,pch=20,cex=0.8,col="green3")
 points(pseudo_m_plot1_ppp,pch=20,cex=0.8,col="brown")
 points(picea_eng_plot1_ppp,pch=20,cex=0.8,col="purple")
 points(pinus_pond_plot1_ppp,pch=20,cex=0.8,col="red")
-points(pinus_albi_plot1_ppp,pch=20,cex=0.8,col="black")
+points(pinus_monti_plot1_ppp,pch=20,cex=0.8,col="black")
 points(tsuga_hete_plot1_ppp,pch=20,cex=0.8,col="blue")
 species_palette = c("yellow", "green3", "brown", "purple","red", "black", "cyan", "blue")
 legend("topright",legend=levels(seedlings_allplots_sp$species), fill=species_palette)
@@ -626,7 +514,7 @@ points(larix_spp_plot2_ppp,pch=20,cex=0.8,col="green3")
 points(pseudo_m_plot2_ppp,pch=20,cex=0.8,col="brown")
 points(picea_eng_plot2_ppp,pch=20,cex=0.8,col="purple")
 points(pinus_pond_plot2_ppp,pch=20,cex=0.8,col="red")
-points(pinus_albi_plot2_ppp,pch=20,cex=0.8,col="black")
+points(pinus_monti_plot2_ppp,pch=20,cex=0.8,col="black")
 points(tsuga_hete_plot2_ppp,pch=20,cex=0.8,col="blue")
 
 plot(seedlings_plot3_ppp, type="n", main="Plot 3 seedlings")
@@ -635,16 +523,16 @@ points(larix_spp_plot3_ppp,pch=20,cex=0.8,col="green3")
 points(pseudo_m_plot3_ppp,pch=20,cex=0.8,col="brown")
 points(picea_eng_plot3_ppp,pch=20,cex=0.8,col="purple")
 points(pinus_pond_plot3_ppp,pch=20,cex=0.8,col="red")
-points(pinus_albi_plot3_ppp,pch=20,cex=0.8,col="black")
+points(pinus_monti_plot3_ppp,pch=20,cex=0.8,col="black")
 points(tsuga_hete_plot3_ppp,pch=20,cex=0.8,col="blue")
 ```
 
 ### Seedling Descriptives
 
-The following code chunk was used to populate descriptive statistics tables 2.1 and 2.2 in Methods section of manuscript draft, which copied directly below for reference. If columns missing, this is a markdown rendering problem, see draft for correct layout
+The following commands derive descriptive statistics used to populate tables 2.1 and 2.2 in manuscript draft, also presented below for reference. If any columns are missing, this is a markdown rendering problem.
 
 |           |               |              |                |              |               |             |
-|-----------|---------------|--------------|----------------|--------------|---------------|-------------|
+|-----------|-----------|-----------|-----------|-----------|-----------|-----------|
 |           | **Elevation** | **Slope**    | **RIX**        | **Aspect**   | **TWI**       | **Wind**    |
 | Pooled    | 1516 (224.2)  | 13.81(7.96)  | 0.51 (0.06)    | 91.5 (58.2)  | 5.03 (1.27)   | 4.88 (0.79) |
 | Plot 1    | 1769 (14.1)   | 7.82 (4.99)  | 0.55 (0.07)    | 144.0(79.2)  | 5.19 (0.61)   | 5.75 (0.12) |
@@ -656,25 +544,24 @@ The following code chunk was used to populate descriptive statistics tables 2.1 
 | Picea e.  | 1509 (225.1)  | 13.83 (8.20) | 0.507 (0.062)  | 91.0 (56.8)  | 5.076 (1.278) | 4.87 (0.78) |
 | Pseudo m. | 1510 (222.3)  | 14.20 (7.70) | 0.505 (0.057)  | 86.3 (48.4)  | 4.890 (1.370) | 4.85 (0.77) |
 | Pinus p.  | 1406 (208.2)  | 16.93 (7.46) | 0.491 (0.043)  | 68.6 (26.7)  | 4.996 (1.343) | 4.47 (0.68) |
-| Pinus a.  | 1709 (291.1)  | 10.15 (5.48) | 0.539 (0.060)  | 156.6(100.8) | 5.121 (0.773) | 5.59 (0.34) |
+| Pinus m.  | 1709 (291.1)  | 10.15 (5.48) | 0.539 (0.060)  | 156.6(100.8) | 5.121 (0.773) | 5.59 (0.34) |
 | Tsuga h.  | 1475 (218.0)  | 13.89 (7.79) | 0.504 (0.046)  | 77.4 (28.0)  | 5.001 (0.991) | 4.89 (0.77) |
 
-|           |                           |                         |                            |
-|-----------|---------------------------|-------------------------|----------------------------|
-|           | **Beetle outbreak stage** | **Fire burn severity**  | **Biogeoclimatic subzone** |
-|           | **NA**                    | **Grey**                | **Red**                    |
-| Pooled    | 0.72                      | 0.04                    | 0.25                       |
-| Plot 1    | 0.55                      | 0.12                    | 0.33                       |
-| Plot 2    | 0.49                      | 0.02                    | 0.49                       |
-| Plot 3    | 1.00                      | 0.00                    | 0.00                       |
-|           |                           |                         |                            |
-| Pinus c.  | 0.72                      | 0.04                    | 0.24                       |
-| Larix o.  | 0.69                      | 0.05                    | 0.26                       |
-| Picea e.  | 0.66                      | 0.04                    | 0.30                       |
-| Pseudo m. | 0.74                      | 0.03                    | 0.23                       |
-| Pinus p.  | 0.79                      | 0.02                    | 0.19                       |
-| Pinus a.  | 0.63                      | 0.04                    | 0.33                       |
-| Tsuga h.  | 0.82                      | 0.00                    | 0.18                       |
+|           |              |              |             |               |              |              |               |            |            |             |
+|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
+|           | **MPB-free** | **MPB-grey** | **MPB-red** | **Fire-free** | **Fire-low** | **Fire-med** | **Fire-high** | **ICHdw1** | **ICHmw4** | **ESSFmw4** |
+| Pooled    | 0.72         | 0.04         | 0.25        | 0.06          | 0.38         | 0.44         | 0.13          | 0.06       | 0.35       | 0.59        |
+| Plot 1    | 0.55         | 0.12         | 0.33        | 0.00          | 0.40         | 0.44         | 0.16          | 0.00       | 0.00       | 1.00        |
+| Plot 2    | 0.49         | 0.02         | 0.49        | 0.15          | 0.19         | 0.56         | 0.10          | 0.00       | 0.00       | 1.00        |
+| Plot 3    | 1.00         | 0.00         | 0.00        | 0.02          | 0.51         | 0.34         | 0.13          | 0.15       | 0.85       | 0.00        |
+|           |              |              |             |               |              |              |               |            |            |             |
+| Pinus c.  | 0.72         | 0.04         | 0.24        | 0.06          | 0.37         | 0.43         | 0.13          | 0.06       | 0.35       | 0.59        |
+| Larix o.  | 0.69         | 0.05         | 0.26        | 0.05          | 0.36         | 0.43         | 0.15          | 0.07       | 0.35       | 0.58        |
+| Picea e.  | 0.66         | 0.04         | 0.30        | 0.04          | 0.40         | 0.45         | 0.11          | 0.04       | 0.38       | 0.58        |
+| Pseudo m. | 0.74         | 0.03         | 0.23        | 0.02          | 0.42         | 0.46         | 0.09          | 0.08       | 0.34       | 0.58        |
+| Pinus p.  | 0.79         | 0.02         | 0.19        | 0.04          | 0.42         | 0.47         | 0.07          | 0.13       | 0.49       | 0.38        |
+| Pinus a.  | 0.63         | 0.04         | 0.33        | 0.02          | 0.42         | 0.37         | 0.19          | 0.00       | 0.04       | 0.96        |
+| Tsuga h.  | 0.82         | 0.00         | 0.18        | 0.06          | 0.41         | 0.47         | 0.06          | 0.00       | 0.41       | 0.59        |
 
 ```{r, warning=FALSE, message=FALSE}
 group_by(darkwoods_seedlings_data, species) %>%
@@ -737,7 +624,7 @@ psych::describe(larix_spp_allplots_sp$distance_m)
 psych::describe(picea_eng_allplots_sp$distance_m)
 psych::describe(pseudo_m_allplots_sp$distance_m)
 psych::describe(pinus_pond_allplots_sp$distance_m)
-psych::describe(pinus_albi_allplots_sp$distance_m)
+psych::describe(pinus_monti_allplots_sp$distance_m)
 psych::describe(tsuga_hete_allplots_sp$distance_m)
 kruskal.test(distance_m ~ plot123, data = seedlings_allplots_sf)
 
@@ -748,21 +635,21 @@ prop.table(plot1_fire_beetle_table, 2)
 table(seedlings_plot1_sp$fire_class)/length((seedlings_plot1_sp$fire_class))
 table(seedlings_plot1_sp$mpb_class)/length((seedlings_plot1_sp$mpb_class))
 table(seedlings_plot1_sp$bec_zone)/length((seedlings_plot1_sp$bec_zone))
-describe(seedlings_plot1_sp$wind)
+psych::describe(seedlings_plot1_sp$wind)
 
 plot2_fire_beetle_table = table(seedlings_plot2_sp$mpb_class, seedlings_plot2_sp$fire_class)
 prop.table(plot2_fire_beetle_table, 1)
 table(seedlings_plot2_sp$fire_class)/length((seedlings_plot2_sp$fire_class))
 table(seedlings_plot2_sp$mpb_class)/length((seedlings_plot2_sp$mpb_class))
 table(seedlings_plot2_sp$bec_zone)/length((seedlings_plot2_sp$bec_zone))
-describe(seedlings_plot2_sp$wind)
+psych::describe(seedlings_plot2_sp$wind)
 
 plot3_fire_beetle_table = table(seedlings_plot3_sp$mpb_class, seedlings_plot3_sp$fire_class)
 prop.table(plot3_fire_beetle_table, 1)
 table(seedlings_plot3_sp$fire_class)/length((seedlings_plot3_sp$fire_class))
 table(seedlings_plot3_sp$mpb_class)/length((seedlings_plot3_sp$mpb_class))
 table(seedlings_plot3_sp$bec_zone)/length((seedlings_plot3_sp$bec_zone))
-describe(seedlings_plot3_sp$wind)
+psych::describe(seedlings_plot3_sp$wind)
 
 #Disturbances across plots
 table(darkwoods_seedlings_data$fire_class)/length((darkwoods_seedlings_data$fire_class))
@@ -784,48 +671,48 @@ kruskal.test(seedlings_allplots_sp$mpb_red~ seedlings_allplots_sp$plot123)
 table(pinus_con_allplots_sp$mpb_class)/length((pinus_con_allplots_sp$mpb_class))
 table(pinus_con_allplots_sp$fire_class)/length((pinus_con_allplots_sp$fire_class))
 table(pinus_con_allplots_sp$bec_zone)/length((pinus_con_allplots_sp$bec_zone))
-describe(pinus_con_allplots_sp$wind)
+psych::describe(pinus_con_allplots_sp$wind)
 
 #disturbance by Larix spp
 table(larix_spp_allplots_sp$mpb_class)/length((larix_spp_allplots_sp$mpb_class))
 table(larix_spp_allplots_sp$fire_class)/length((larix_spp_allplots_sp$fire_class))
 table(larix_spp_allplots_sp$bec_zone)/length((larix_spp_allplots_sp$bec_zone))
-describe(larix_spp_allplots_sp$wind)
+psych::describe(larix_spp_allplots_sp$wind)
 
 #disturbance by Picea engelmanii
 table(picea_eng_allplots_sp$mpb_class)/length((picea_eng_allplots_sp$mpb_class))
 table(picea_eng_allplots_sp$fire_class)/length((picea_eng_allplots_sp$fire_class))
 table(picea_eng_allplots_sp$bec_zone)/length((picea_eng_allplots_sp$bec_zone))
-describe(picea_eng_allplots_sp$wind)
+psych::describe(picea_eng_allplots_sp$wind)
 
 #disturbance by Pseudotsuga menziesii
 table(pseudo_m_allplots_sp$mpb_class)/length((pseudo_m_allplots_sp$mpb_class))
 table(pseudo_m_allplots_sp$fire_class)/length((pseudo_m_allplots_sp$fire_class))
 table(pseudo_m_allplots_sp$bec_zone)/length((pseudo_m_allplots_sp$bec_zone))
-describe(pseudo_m_allplots_sp$wind)
+psych::describe(pseudo_m_allplots_sp$wind)
 
 #disturbance by Pinus ponderosa
 table(pinus_pond_allplots_sp$mpb_class)/length((pinus_pond_allplots_sp$mpb_class))
 table(pinus_pond_allplots_sp$fire_class)/length((pinus_pond_allplots_sp$fire_class))
 table(pinus_pond_allplots_sp$bec_zone)/length((pinus_pond_allplots_sp$bec_zone))
-describe(pinus_pond_allplots_sp$wind)
+psych::describe(pinus_pond_allplots_sp$wind)
 
-#disturbance by Pinus albicaulis
-table(pinus_albi_allplots_sp$mpb_class)/length((pinus_albi_allplots_sp$mpb_class))
-table(pinus_albi_allplots_sp$fire_class)/length((pinus_albi_allplots_sp$fire_class))
-table(pinus_albi_allplots_sp$bec_zone)/length((pinus_albi_allplots_sp$bec_zone))
-describe(pinus_albi_allplots_sp$wind)
+#disturbance by Pinus monticola
+table(pinus_monti_allplots_sp$mpb_class)/length((pinus_monti_allplots_sp$mpb_class))
+table(pinus_monti_allplots_sp$fire_class)/length((pinus_monti_allplots_sp$fire_class))
+table(pinus_monti_allplots_sp$bec_zone)/length((pinus_monti_allplots_sp$bec_zone))
+psych::describe(pinus_monti_allplots_sp$wind)
 
 #disturbance by tsuga heterphylla
-table(tsuga_hete_allplots_sp$mpb_class)/length((pinus_albi_allplots_sp$mpb_class))
-table(tsuga_hete_allplots_sp$fire_class)/length((pinus_albi_allplots_sp$fire_class))
-table(tsuga_hete_allplots_sp$bec_zone)/length((pinus_albi_allplots_sp$bec_zone))
-describe(tsuga_hete_allplots_sp$wind)
+table(tsuga_hete_allplots_sp$mpb_class)/length((pinus_monti_allplots_sp$mpb_class))
+table(tsuga_hete_allplots_sp$fire_class)/length((pinus_monti_allplots_sp$fire_class))
+table(tsuga_hete_allplots_sp$bec_zone)/length((pinus_monti_allplots_sp$bec_zone))
+psych::describe(tsuga_hete_allplots_sp$wind)
 ```
 
 ### Seedling Densities
 
-We test for global and local trends in seedling density using kernel density plots and nearest neighbour models. Non-spatial effects are shown by patterns in absolute density from nearest-neighbour-distance `nndist` metrics between plots and across plots by species and across species pooled.
+Patterns in seeding density are first tested nearest-neighbour models using the `nndist`. This is applied across plots and by species.
 
 ```{r, warning=FALSE, message=FALSE}
 #compute nearest neighbour mean distance
@@ -834,10 +721,10 @@ ann_seedlings_plot1 <- mean(nndist(seedlings_plot1_ppp, k=1))
 ann_seedlings_plot2 <- mean(nndist(seedlings_plot2_ppp, k=1))
 ann_seedlings_plot3 <- mean(nndist(seedlings_plot3_ppp, k=1))
 
-describe(ann_seedlings_allplots)
-describe(ann_seedlings_plot1)
-describe(ann_seedlings_plot2)
-describe(ann_seedlings_plot3)
+psych::describe(ann_seedlings_allplots)
+psych::describe(ann_seedlings_plot1)
+psych::describe(ann_seedlings_plot2)
+psych::describe(ann_seedlings_plot3)
 kruskal.test(ann_seedlings_allplots ~ plot123, data = seedlings_allplots_sf)
 
 ann_pinus_con_allplots <- mean(nndist(pinus_con_allplots_ppp, k=1))
@@ -845,16 +732,16 @@ ann_larix_spp_allplots <- mean(nndist(larix_spp_allplots_ppp, k=1))
 ann_picea_eng_allplots <- mean(nndist(picea_eng_allplots_ppp, k=1))
 ann_pseudo_m_allplots <- mean(nndist(pseudo_m_allplots_ppp, k=1))
 ann_pinus_pond_allplots <- mean(nndist(pinus_pond_allplots_ppp, k=1))
-ann_pinus_albi_allplots <- mean(nndist(pinus_albi_allplots_ppp, k=1))
+ann_pinus_monti_allplots <- mean(nndist(pinus_monti_allplots_ppp, k=1))
 ann_tsuga_hete_allplots <- mean(nndist(tsuga_hete_allplots_ppp, k=1))
 
-describe(ann_pinus_con_allplots)
-describe(ann_larix_spp_allplots)
-describe(ann_picea_eng_allplots)
-describe(ann_pseudo_m_allplots)
-describe(ann_pinus_pond_allplots)
-describe(ann_pinus_albi_allplots)
-describe(ann_tsuga_hete_allplots)
+psych::describe(ann_pinus_con_allplots)
+psych::describe(ann_larix_spp_allplots)
+psych::describe(ann_picea_eng_allplots)
+psych::describe(ann_pseudo_m_allplots)
+psych::describe(ann_pinus_pond_allplots)
+psych::describe(ann_pinus_monti_allplots)
+psych::describe(ann_tsuga_hete_allplots)
 
 #nearest neighbour by species and plots
 ann_larix_spp_plot1 <- mean(nndist(seedlings_plot1_ppp, k=1))
@@ -862,7 +749,7 @@ ann_pseudo_m_plot1 <- mean(nndist(seedlings_plot1_ppp, k=1))
 ann_picea_eng_plot1 <- mean(nndist(seedlings_plot1_ppp, k=1))
 ann_pinus_con_plot1 <- mean(nndist(seedlings_plot1_ppp, k=1))
 ann_pinus_pond_plot1 <- mean(nndist(seedlings_plot1_ppp, k=1))
-ann_pinus_albi_plot1 <- mean(nndist(seedlings_plot1_ppp, k=1))
+ann_pinus_monti_plot1 <- mean(nndist(seedlings_plot1_ppp, k=1))
 ann_tsuga_hete_plot1 <- mean(nndist(seedlings_plot1_ppp, k=1))
 
 ann_larix_spp_plot2 <- mean(nndist(seedlings_plot2_ppp, k=1))
@@ -870,7 +757,7 @@ ann_pseudo_m_plot2 <- mean(nndist(seedlings_plot2_ppp, k=1))
 ann_picea_eng_plot2 <- mean(nndist(seedlings_plot2_ppp, k=1))
 ann_pinus_con_plot2 <- mean(nndist(seedlings_plot2_ppp, k=1))
 ann_pinus_pond_plot2 <- mean(nndist(seedlings_plot2_ppp, k=1))
-ann_pinus_albi_plot2 <- mean(nndist(seedlings_plot2_ppp, k=1))
+ann_pinus_monti_plot2 <- mean(nndist(seedlings_plot2_ppp, k=1))
 ann_tsuga_hete_plot2 <- mean(nndist(seedlings_plot2_ppp, k=1))
 
 ann_larix_spp_plot3 <- mean(nndist(seedlings_plot3_ppp, k=1))
@@ -878,13 +765,13 @@ ann_pseudo_m_plot3 <- mean(nndist(seedlings_plot3_ppp, k=1))
 ann_picea_eng_plot3 <- mean(nndist(seedlings_plot3_ppp, k=1))
 ann_pinus_con_plot3 <- mean(nndist(seedlings_plot3_ppp, k=1))
 ann_pinus_pond_plot3 <- mean(nndist(seedlings_plot3_ppp, k=1))
-ann_pinus_albi_plot3 <- mean(nndist(seedlings_plot3_ppp, k=1))
+ann_pinus_monti_plot3 <- mean(nndist(seedlings_plot3_ppp, k=1))
 ann_tsuga_hete_plot3 <- mean(nndist(seedlings_plot3_ppp, k=1))
 ```
 
 ### Seedling Bandwidths
 
-An optimised bandwidth for subsequent spatial modelling is derived using likelihood cross-validation operation `bw.ppl`. Diggle+Berman optimizer written as option but commented out, as no signficant difference found, unless you find otherwise??
+Bandwidth optimization is carried out with likelihood cross-validation test `bw.ppl`: 11 metres. Additional optimizer also available: `bw.diggle`.
 
 ```{r, fig.show='hold', out.width='33%', warning=FALSE, message=FALSE}
 bw_likelihood_plot1 = bw.ppl(seedlings_plot1_ppp)
@@ -905,7 +792,7 @@ plot(bw_likelihood_plot3, main="Plot 3 - LCV Bandwidth", xlim=c(0,16))
 #plot(bw_diggle_plot1, main="Plot 1 - Diggle & Bearman CV-Bandwidth test", xlim=c(0,1))
 ```
 
-Kernel density of seedling patterns is modelled using the `epanechnikov` kernel and heat maps. The `epanechnikov` was chosen over `Gaussian` and `Nadaraya-Watson` kernels in favour of its conservative handling of non-negative, outlying estimators and its option of MSE (and RMSE) over MISE metrics. Though, this still needs some discussion. Question raises, should we be testing others and rejigging the results section? I found scare documentation online comparing these kernels.
+Seedling density patterns were then mapped using the `epanechnikov` kernel density estimator and heat maps. The `epanechnikov` was chosen over `Gaussian` and `Nadaraya-Watson` kernels in response to non-constant instensity as it handles negative outliers more conservatively and still provides MSE rather than MISE metrics.
 
 ```{r, fig.show='hold', out.width='50%', warning=FALSE, message=FALSE}
 #plot 1 - all species pooled - bandwidth=10
@@ -946,13 +833,12 @@ persp(density_plot3, main="Plot 3")
 
 ### Seedling Clustering
 
-We tested for patterns of dispersion and clustering using monte-carlo simulation of complete spatial randomness model (CSR), repeated 999 times and fitted with non-linear `Kinhom` kernel. Non-linear methods were employed after quadrat test, commented out below, showed intensity was non-constant.
+We tested for patterns of dispersion and clustering using monte-carlo simulation of complete spatial randomness model (CSR), repeated 999 times and fitted with non-linear `Kinhom` kernel. Non-linear methods were employed after quadrat test, commented out below, showed non-constant intensity. This is done by species and by plots.
 
-This is done by species and by plots. Though, we have not tested individual species within indivdual plots. As disturbance maps in section 2.4 above show, there are likely advantages for MPB-hosts in plot 3 where there was no MPB-attacks found. If needed, we saved commands below for the Clark+Evan test of aggregation, which is suitable for its use of Donnelly's edge effects constraint (1978) developed to address long boundaries of rectangular field plot sampling.
+We have not tested CSR of individual species within indivdual plots. There are likely advantages for MPB-hosts in plot 3 where there was no MPB-attacks found. For further tests of clustering, we commented out functions below to apply the Clark Evan's test of aggregation (1954) fitted with Donnelly's edge effects constraint (1978) that is suitable for rectangular field plots with long boundaries similar to ours.
 
-\~Clark, P.J. and Evans, F.C. (1954) Distance to nearest neighbour as a measure of spatial relationships in populations Ecology 35, 445--453.\~
-
-\~Donnelly, K. (1978) Simulations to determine the variance and edge-effect of total nearest neighbour distance. In I. Hodder (ed.) Simulation studies in archaeology, Cambridge/New York: Cambridge University Press, pp 91--95.\~
+-   `Clark, P.J. and Evans, F.C. (1954) Distance to nearest neighbour as a measure of spatial relationships in populations Ecology 35, 445–453.`
+-   `Donnelly, K. (1978) Simulations to determine the variance and edge-effect of total nearest neighbour distance. In I. Hodder (ed.) Simulation studies in archaeology, Cambridge/New York: Cambridge University Press, pp 91–95.`
 
 ```{r, warning=FALSE, message=FALSE}
 # Quadrat test of intensity distribution
@@ -970,21 +856,20 @@ mcarlo_kinhom999sim_plot1 = envelope(seedlings_plot1_ppp,
                                      nsim=999,
                                      correction="best",
                                      global = TRUE)
+plot(mcarlo_kinhom999sim_plot1)
 
 mcarlo_kest999sim_plot2 = envelope(seedlings_plot2_ppp,
                                    Kinhom,
                                    nsim=999,
                                    correction="best",
                                    global = TRUE)
+plot(mcarlo_kest999sim_plot2)
 
 mcarlo_kinhom999sim_plot3 = envelope(seedlings_plot3_ppp,
                                      Kinhom,
                                      nsim=999,
                                      correction="best",
                                      global = TRUE)
-
-plot(mcarlo_kinhom999sim_plot1)
-plot(mcarlo_kest999sim_plot2)
 plot(mcarlo_kinhom999sim_plot3)
 
 mcarlo_999sim_pinus_con = envelope(pinus_con_pooled,
@@ -992,74 +877,66 @@ mcarlo_999sim_pinus_con = envelope(pinus_con_pooled,
                                    nsim = 999,
                                    correction="best",
                                    global = TRUE)
+plot(mcarlo_999sim_pinus_con)
 
 mcarlo_999sim_larix_spp = envelope(larix_spp_pooled,
                                    Kinhom,
                                    nsim = 999,
                                    correction="best",
                                    global = TRUE)
+plot(mcarlo_999sim_larix_spp)
 
 mcarlo_999sim_picea_eng = envelope(picea_eng_pooled,
                                    Kinhom,
                                    nsim = 999,
                                    correction="best",
                                    global = TRUE)
+plot(mcarlo_999sim_picea_eng)
 
 mcarlo_999sim_pseudo_m = envelope(pseudo_m_pooled,
                                   Kinhom,
                                   nsim = 999,
                                   correction="best",
                                   global = TRUE)
+plot(mcarlo_999sim_pseudo_m)
 
 mcarlo_999sim_pinus_pond = envelope(pinus_pond_pooled,
                                     Kinhom,
                                     nsim = 999,
                                     correction="best",
                                     global = TRUE)
+plot(mcarlo_999sim_pinus_pond)
 
-mcarlo_999sim_pinus_albi = envelope(pinus_albi_pooled,
+mcarlo_999sim_pinus_monti = envelope(pinus_monti_pooled,
                                     Kinhom,
                                     nsim = 999,
                                     correction="best",
                                     global = TRUE)
+plot(mcarlo_999sim_pinus_monti)
 
 mcarlo_999sim_tsuga_hete = envelope(tsuga_hete_pooled,
                                     Kinhom,
                                     nsim = 999,
                                     correction="best",
                                     global = TRUE)
-
-plot(mcarlo_999sim_pinus_con)
-plot(mcarlo_999sim_larix_spp)
-plot(mcarlo_999sim_picea_eng)
-plot(mcarlo_999sim_pseudo_m)
-plot(mcarlo_999sim_pinus_pond)
-plot(mcarlo_999sim_pinus_albi)
 plot(mcarlo_999sim_tsuga_hete)
-print(mcarlo_999sim_pinus_con)
-print(mcarlo_999sim_larix_spp)
-print(mcarlo_999sim_picea_eng)
-print(mcarlo_999sim_pseudo_m)
-print(mcarlo_999sim_pinus_pond)
-print(mcarlo_999sim_pinus_albi)
-print(mcarlo_999sim_tsuga_hete)
 
-clarkevans.test(seedlings_allplots_ppp, nsim = 999)
-clarkevans.test(seedlings_plot1_ppp, nsim = 999)
-clarkevans.test(seedlings_plot2_ppp, nsim = 999)
-clarkevans.test(seedlings_plot3_ppp, nsim = 999)
-clarkevans.test(pinus_con_pooled, nsim = 999)
-clarkevans.test(larix_spp_pooled, nsim = 999)
-clarkevans.test(picea_eng_pooled, nsim = 999)
-clarkevans.test(pseudo_m_pooled, nsim = 999)
-clarkevans.test(pinus_pond_pooled, nsim = 999)
-clarkevans.test(pinus_albi_pooled, nsim = 999)
-clarkevans.test(tsuga_hete_pooled, nsim = 999)
+#clarkevans.test(seedlings_allplots_ppp, nsim = 999)
+#clarkevans.test(seedlings_plot1_ppp, nsim = 999)
+#clarkevans.test(seedlings_plot2_ppp, nsim = 999)
+#clarkevans.test(seedlings_plot3_ppp, nsim = 999)
+#clarkevans.test(pinus_con_pooled, nsim = 999)
+#clarkevans.test(larix_spp_pooled, nsim = 999)
+#clarkevans.test(picea_eng_pooled, nsim = 999)
+#clarkevans.test(pseudo_m_pooled, nsim = 999)
+#clarkevans.test(pinus_pond_pooled, nsim = 999)
+#clarkevans.test(pinus_monti_pooled, nsim = 999)
+#clarkevans.test(tsuga_hete_pooled, nsim = 999)
 ```
 
 ### Seedling Point Processes
 
-Covariates are screened as candidate predictors for final inclusion in the point-pattern-Cox-process models using Likelihood-Ratio-Test that measures their odds of prediction against intercept-only model. Similar to glmnet latticed model, first ones out are dropped from the model.
+Covariates are screened for final inputs in the point-pattern-Cox-process model using Likelihood-Ratio-Test. This is quick and easy test to measure odds of prediction against intercept-only model. Similar to glmnet in section 1, covariates are dropped if their odds (or coefficients) are not impressive compared to zero-model. Anova analysis provides metric of statistical signficance.
 
 Using the remaining best subset, a Cox-thomas model is fitted using `kppm` regression, with a previously optimized bandwidth as spatial threshold, and `isotropic` correction.
 
@@ -1079,7 +956,7 @@ ppm_allplots_fire_med = ppm(seedlings_allplots_ppp ~ fire_med_im, correction="is
 ppm_allplots_fire_low = ppm(seedlings_allplots_ppp ~ fire_low_im, correction="isotropic")
 
 summary(ppm_allplots)
-summar(ppm_allplots_distance_tree)
+summary(ppm_allplots_distance_tree)
 summary(ppm_allplots_elevation)
 summary(ppm_allplots_slope)
 summary(ppm_allplots_aspect)
@@ -1105,10 +982,17 @@ anova(ppm_allplots, ppm_allplots_fire_high, test = "LRT")
 anova(ppm_allplots, ppm_allplots_fire_med, test = "LRT")
 anova(ppm_allplots, ppm_allplots_fire_low, test = "LRT") #moderately significant p = 0.01281
 
-
+marks(seedlings_pooled) <- NULL
+marks(pinus_con_pooled) <- NULL
+marks(larix_spp_pooled) <- NULL
+marks(picea_eng_pooled) <- NULL
+marks(pseudo_m_pooled) <- NULL
+marks(pinus_pond_pooled) <- NULL
+marks(pinus_monti_pooled) <- NULL
+marks(tsuga_hete_pooled) <- NULL
 
 ppm_seedlings_pooled = kppm(seedlings_pooled ~ distance_tree_im
-                            + aspect_class + rix_im + wind_im +
+                            + aspect_im + rix_im + wind_im +
                               mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
                             "Thomas", kernel="epanechnikov", correction="isotropic", 
                             sigma=bw_likelihood_allplots)
@@ -1119,29 +1003,41 @@ ppm_pinus_con_pooled = kppm(pinus_con_pooled ~ distance_tree_im +
                             "Thomas", kernel="epanechnikov", correction="isotropic", 
                             sigma=bw_likelihood_allplots)
 
-ppm_larix_spp_pooled = kppm(larix_spp_pooled ~ aspect_log + rix_im +
-                                                   wind_im + mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                                                 "Thomas", kernel="epanechnikov", correction="isotropic", sigma=bw_likelihood_allplots)
+ppm_larix_spp_pooled = kppm(larix_spp_pooled ~ distance_tree_im +
+                              aspect_im + rix_im + wind_im + 
+                              mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
+                            "Thomas", kernel="epanechnikov", correction="isotropic", 
+                            sigma=bw_likelihood_allplots)
 
-ppm_picea_eng_pooled = kppm(picea_eng_pooled ~ aspect_im + rix_im +
-                                                   wind_im + mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                                                 "Thomas", kernel="epanechnikov", correction="isotropic", sigma=bw_likelihood_allplots)
+ppm_picea_eng_pooled = kppm(picea_eng_pooled ~ distance_tree_im + 
+                              aspect_im + rix_im + wind_im + 
+                              mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
+                            "Thomas", kernel="epanechnikov", correction="isotropic", 
+                            sigma=bw_likelihood_allplots)
 
-ppm_pseudo_m_pooled = kppm(pseudo_m_pooled ~ aspect_im + rix_im +
-                                                  wind_im + mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                                                "Thomas", kernel="epanechnikov", correction="isotropic", sigma=bw_likelihood_allplots)
+ppm_pseudo_m_pooled = kppm(pseudo_m_pooled ~ distance_tree_im + 
+                             aspect_im + rix_im + wind_im + 
+                             mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
+                           "Thomas", kernel="epanechnikov", correction="isotropic", 
+                           sigma=bw_likelihood_allplots)
 
-ppm_pinus_pond_pooled = kppm(pinus_pond_pooled ~ aspect_log + rix_im +
-                                                    wind_im + mpb_grey_stack + mpb_red_im + fire_high_im + fire_low_im,
-                                                  "Thomas", kernel="epanechnikov", correction="isotropic", sigma=bw_likelihood_allplots)
+ppm_pinus_pond_pooled = kppm(pinus_pond_pooled ~ distance_tree_im + 
+                               aspect_im + rix_im + wind_im + 
+                             mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
+                           "Thomas", kernel="epanechnikov", correction="isotropic", 
+                           sigma=bw_likelihood_allplots)
 
-ppm_pinus_albi_pooled = kppm(pinus_albi_pooled ~ aspect_log + rix_im +
-                                                    wind_im + mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                                                  "Thomas", kernel="epanechnikov", correction="isotropic", sigma=bw_likelihood_allplots)
+ppm_pinus_monti_pooled = kppm(pinus_monti_pooled ~ distance_tree_im + 
+                                aspect_im + rix_im + wind_im + 
+                             mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
+                           "Thomas", kernel="epanechnikov", correction="isotropic", 
+                           sigma=bw_likelihood_allplots)
 
-ppm_tsuga_hete_pooled = kppm(tsuga_hete_pooled ~ aspect_log + rix_im +
-                                                    wind_im + mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                                                  "Thomas", kernel="epanechnikov", correction="isotropic", sigma=bw_likelihood_allplots)
+ppm_tsuga_hete_pooled = kppm(tsuga_hete_pooled ~ distance_tree_im + 
+                               aspect_im + rix_im + wind_im + 
+                             mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
+                           "Thomas", kernel="epanechnikov", correction="isotropic", 
+                           sigma=bw_likelihood_allplots)
 
 summary(ppm_seedlings_pooled)
 summary(ppm_pinus_con_pooled)
@@ -1149,6 +1045,6 @@ summary(ppm_larix_spp_pooled)
 summary(ppm_picea_eng_pooled)
 summary(ppm_pseudo_m_pooled)
 summary(ppm_pinus_pond_pooled)
-summary(ppm_pinus_albi_pooled)
+summary(ppm_pinus_monti_pooled)
 summary(ppm_tsuga_hete_pooled)
 ```
