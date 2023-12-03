@@ -1,10 +1,14 @@
 ---
-title: "Spatial Point Process Model of Seedling Patterns"
+title: "Spatial Point Pattern Processes of Conifer Seedlings"
 author: "SMurphy"
 date: "2021-01-30"
 output:
   github_document:
-    keep_html: true
+    toc: TRUE
+    toc_depth: 5
+    number_sections: TRUE
+    df_print: tibble
+#always_allow_html: yes
 ---
 
 ```{r setup, include=FALSE, message = FALSE, warning=FALSE, error=FALSE}
@@ -48,28 +52,27 @@ library(dplyr)
 library(RColorBrewer)
 #install.packages("webshot")
 #webshot::install_phantomjs()
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, error=FALSE,
-                      comment = NA,tidy.opts=list(width.cutoff=60),tidy=TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, error=FALSE, comment = NA,tidy.opts=list(width.cutoff=60),tidy=TRUE)
 ```
 
 ```{r, eval=FALSE, echo=FALSE}
-#Note: some packages require R-version >4.3 installed 
+#Note: some packages require R-version >4.3 installed
 #Stage-I dependencies
 requirements_I = install.packages(c(
-  "readxl", "sf", "kernlab", "ggplot2", "dplyr", 
-  "RColorBrewer", "psych", "useful", "caret", 
-  "tibble", "klaR", "ModelMetrics", "DescTools", 
-  "MLmetrics", "coefplot", "glmnet", "jsonlite", 
-  "plotly", "RSQLite", "tidyverse", "useful", 
-  "xgboost", "webshot", "webshot2"), 
+  "readxl", "sf", "kernlab", "ggplot2", "dplyr",
+  "RColorBrewer", "psych", "useful", "caret",
+  "tibble", "klaR", "ModelMetrics", "DescTools",
+  "MLmetrics", "coefplot", "glmnet", "jsonlite",
+  "plotly", "RSQLite", "tidyverse", "useful",
+  "xgboost", "webshot", "webshot2"),
   dependencies=TRUE)
 
 #Stage-II dependencies
 requirements_II = install.packages(c(
-  "spdep", "gstat", "rgdal", "maptools", "raster", 
-  "spatstat", "GISTools", "rgeos", "sp", 
-  "rpanel", "ncf", "spatial", "spatstat.data", 
-  "spatstat.local", "dplyr", "RColorBrewer"), 
+  "spdep", "gstat", "rgdal", "maptools", "raster",
+  "spatstat", "GISTools", "rgeos", "sp",
+  "rpanel", "ncf", "spatial", "spatstat.data",
+  "spatstat.local", "dplyr", "RColorBrewer"),
   dependencies=TRUE)
 
 requirements_I
@@ -78,14 +81,15 @@ requirements_II
 
 ## Stage I: Covariate Selection
 
-### Import Data+Packages
+### Import Data
 
-Seed set to `123` for replication. Import the `1.1.darkwoods_masterfile.xlsx` dataset. This includes seedlings and covariate values previously processed, classified and sampled from stem locations of seedlings using ArcGIS environment.
+Seed set to `123` for replication. Import the `1.1.darkwoods_seedlings.xls` dataset. This includes seedlings and covariate values previously processed, classified and sampled from stem locations of seedlings using ArcGIS environment.
 
 ```{r, warning=FALSE, message=FALSE}
-set.seed(123) 
-darkwoods_seedlings_data <- readxl::read_excel("1.1.darkwoods_masterfile.xlsx")
-knitr::kable(head(darkwoods_seedlings_data))
+set.seed(123)
+darkwoods_seedlings_data <- readxl::read_excel("1.1.darkwoods_seedlings.xls")
+darkwoods_seedlings_data
+#knitr::kable(head(darkwoods_seedlings_data))
 ```
 
 For local deployment, package dependencies from this iteration are loaded using the `requirements_I` variable.
@@ -93,14 +97,14 @@ For local deployment, package dependencies from this iteration are loaded using 
 ```{r,eval=FALSE, warning=FALSE, message=FALSE}
 requirements_I = install.packages(c(
   "readxl", "sf", "kernlab", "ggplot2", "dplyr",
-  "RColorBrewer", "psych", "useful", "caret", 
-  "tibble", "klaR", "ModelMetrics", "DescTools", 
-  "MLmetrics", "coefplot", "glmnet", "jsonlite", 
+  "RColorBrewer", "psych", "useful", "caret",
+  "tibble", "klaR", "ModelMetrics", "DescTools",
+  "MLmetrics", "coefplot", "glmnet", "jsonlite",
   "plotly", "RSQLite", "tidyverse", "useful", "xgboost"),
   dependencies=TRUE)
 # note warning messages are turned off for this chunk: 'warnings=FALSE'
 
-requirements_I 
+requirements_I
 ```
 
 ### Model Fitting
@@ -108,40 +112,40 @@ requirements_I
 Derive OLS models to explore covariate effects against intercept only models
 
 ```{r, fig.show='hold', out.width='50%', warning=FALSE, message=FALSE}
-seed_formula = intensity ~ distance_m + elevation_asl + slope + 
-  aspect + rix + twi + wind + mpb_grey + mpb_red + 
-  fire_high + fire_med + fire_low - 1 
+seed_formula = intensity ~ distance_m + elevation_asl + slope +
+  aspect + rix + twi + wind + mpb_grey + mpb_red +
+  fire_high + fire_med + fire_low - 1
 
-seed_formula2 = intensity ~ distance_m + elevation_asl + slope + 
-  aspect + rix + twi + wind + mpb_class + 
-  fire_high + fire_med + fire_low + fire_unbur - 1 
+seed_formula2 = intensity ~ distance_m + elevation_asl + slope +
+  aspect + rix + twi + wind + mpb_class +
+  fire_high + fire_med + fire_low + fire_unbur - 1
 
-seed_formula3 = intensity ~ distance_m + elevation_asl + slope + 
-  aspect + rix + twi + wind + mpb_grey + mpb_red + 
-  fire_high + fire_med + fire_low + fire_unbur + bec_zone - 1 
+seed_formula3 = intensity ~ distance_m + elevation_asl + slope +
+  aspect + rix + twi + wind + mpb_grey + mpb_red +
+  fire_high + fire_med + fire_low + fire_unbur + bec_zone - 1
 
-seed_formula4 = intensity ~ distance_m + elevation_asl + slope + 
-  aspect + rix + twi + wind + mpb_grey + mpb_red + 
-  fire_high + fire_med + fire_low + fire_unbur + bec_zone + species - 1  
+seed_formula4 = intensity ~ distance_m + elevation_asl + slope +
+  aspect + rix + twi + wind + mpb_grey + mpb_red +
+  fire_high + fire_med + fire_low + fire_unbur + bec_zone + species - 1
 
-seed_formula5 = intensity ~ distance_m + elevation_asl + slope + 
-  aspect + rix + twi + wind + mpb_grey + mpb_red + 
-  fire_high + fire_med + fire_low + fire_unbur + bec_zone + species + precip - 1  
-
-# Fitted with disturbance interaction effects by mpb-class and fire-classes combined
-seed_formula6.1 = intensity ~ distance_m + elevation_asl + slope + 
-  aspect + rix + twi + wind + bec_zone + species + precip + 
-  mpb_class*fire_class - 1  
+seed_formula5 = intensity ~ distance_m + elevation_asl + slope +
+  aspect + rix + twi + wind + mpb_grey + mpb_red +
+  fire_high + fire_med + fire_low + fire_unbur + bec_zone + species + precip - 1
 
 # Fitted with disturbance interaction effects by mpb-class and fire-classes combined
-seed_formula6.2 = intensity ~ distance_m + elevation_asl + slope + 
-  aspect + rix + twi + wind + bec_zone + species + precip + 
-  mpb_red*fire_high + mpb_grey*fire_high + mpb_red*fire_low + mpb_grey*fire_low - 1  
+seed_formula6.1 = intensity ~ distance_m + elevation_asl + slope +
+  aspect + rix + twi + wind + bec_zone + species + precip +
+  mpb_class*fire_class - 1
+
+# Fitted with disturbance interaction effects by mpb-class and fire-classes combined
+seed_formula6.2 = intensity ~ distance_m + elevation_asl + slope +
+  aspect + rix + twi + wind + bec_zone + species + precip +
+  mpb_red*fire_high + mpb_grey*fire_high + mpb_red*fire_low + mpb_grey*fire_low - 1
 
 allseeds_lm = lm(seed_formula, data=darkwoods_seedlings_data)
 allseeds_lm2 = lm(seed_formula2, data=darkwoods_seedlings_data)
 allseeds_lm3 = lm(seed_formula3, data=darkwoods_seedlings_data)
-allseeds_lm4 = lm(seed_formula4, data=darkwoods_seedlings_data) 
+allseeds_lm4 = lm(seed_formula4, data=darkwoods_seedlings_data)
 allseeds_lm5 = lm(seed_formula5, data=darkwoods_seedlings_data)
 allseeds_lm6.1 = lm(seed_formula6.1, data=darkwoods_seedlings_data)
 allseeds_lm6.2 = lm(seed_formula6.2, data=darkwoods_seedlings_data)
@@ -193,7 +197,7 @@ allseedsY_train6.2 <- useful::build.y(allseeds_lm6.2, data=darkwoods_seedlings_d
 
 From the `glmnet` package, covariates are fitted to a generalised linear model over an elastic-net (latticed plane) in order to explore their effects under varying lambdas. The `alpha=1` function is used to fit a lasso-model with a lambda that suppresses outliers, and the `alpha=0` function fits a ridge-based lambda to empower correlation. Adding the `nfolds` function, we apply a 10K-fold cross validation and then compare coeffients visually using the `coefpath` function from the `coefplot` package. Zoom in on graphs to determine the remaining predictors as the model approaches a mean of zero. Most interesting model seems to 6.1.
 
-```{r, fig.show='hold', out.width='100%', warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE}
 allseeds_glmnet_lasso_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train, y=allseedsY_train, family='gaussian', alpha=1, nfolds = 10)
 allseeds_glmnet_ridge_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train, y=allseedsY_train, family='gaussian', alpha=0, nfolds = 10)
 allseeds_glmnet_lasso2_cv_10fold <- glmnet::cv.glmnet(x=allseedsX_train2, y=allseedsY_train2, family = 'gaussian', alpha = 1, nfolds = 10)
@@ -217,9 +221,9 @@ coefplot::coefpath(allseeds_glmnet_ridge6.2_cv_10fold)
 
 ## Stage II: Spatial Point Process Modelling
 
-### Import Data+Packages
+### Import Data
 
-In this section, we use three separate datasets. One is already loaded from excel masterfile above. Two are imported in excel and raster formats and renamed below. Separate datasets of specific formats are required by the `spatstat` package depending on spatial modelling operations, including conversion of covariates into `.img` image files in the code chunk after this.
+In this section, we use three separate datasets. One is already loaded, the main seedlings dataset above. Two more are imported as excel and raster files and renamed below. Separate datasets of specific formats are required by the `spatstat` package depending on spatial modelling operations, including conversion of covariates into `.img` image files in the code chunk after this.
 
 1.  `darkwoods_seedlings_data` - already loaded excel file from above,
 2.  `darkwoods_seedlings_tree_distance` - excel file showing seed-distance,
@@ -228,17 +232,18 @@ In this section, we use three separate datasets. One is already loaded from exce
 Package requirements for stage-II listed below.
 
 ```{r, eval=FALSE, warning=FALSE, message=FALSE}
-requirements_II = install.packages(c("spdep", "gstat", "rgdal", "maptools", "raster", 
-                                  "spatstat", "GISTools", "rgeos", "sp", 
-                                  "rpanel", "ncf", "spatial", "spatstat.data", 
-                                  "spatstat.local", "dplyr", "RColorBrewer", "jsonlite", 
+requirements_II = install.packages(c("spdep", "gstat", "rgdal", "maptools", "raster",
+                                  "spatstat", "GISTools", "rgeos", "sp",
+                                  "rpanel", "ncf", "spatial", "spatstat.data",
+                                  "spatstat.local", "dplyr", "RColorBrewer", "jsonlite",
                                   "plotly", "RSQLite", "tidyverse", "useful", "xgboost"), dependencies=TRUE)
 requirements_II # settings on 'warnings=FALSE'
 ```
 
 ```{r, warning=FALSE, message=FALSE}
 darkwoods_seedlings_tree_distance = read_excel("1.2.darkwoods_seedlings_distance.xls")
-knitr::kable(head(darkwoods_seedlings_tree_distance))
+darkwoods_seedlings_tree_distance
+#knitr::kable(head(darkwoods_seedlings_tree_distance))
 
 elevation_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/elevation_utm.tif"))
 aspect_utm = readAll(raster("~/Desktop/git_repos/darkwoods_seedlings/SpatialData/aspect_utm.tif"))
@@ -260,11 +265,11 @@ Convert datasets of seedlings and seed-distance from `sf` simple feature objects
 The `crsProject` variable sets projections to `EPSG:32611`. Question, is it better practice to reproject everything to the LiDAR's *original* coordinate system than to reproject everything to Landsat's *official* projection? Although our higher-resolution LiDAR is superior in terms of georeferencing accuracy, most important predictors are Landsat-derived. Additionally, field equipment was calibrated to `EPSG:3005`.
 
 ```{r, warning=FALSE, message=FALSE}
-# Project crs projection 
+# Project crs projection
 crsProject = st_crs("EPSG:32611")
 # Convert to sf
-seedlings_allplots_sf = st_as_sf(darkwoods_seedlings_data, 
-                                 coords = c("x", "y"), 
+seedlings_allplots_sf = st_as_sf(darkwoods_seedlings_data,
+                                 coords = c("x", "y"),
                                  crs = crsProject)
 
 distance_tree = st_as_sf(darkwoods_seedlings_tree_distance,
@@ -287,7 +292,7 @@ seedlings_allplots_sf$species <- factor(seedlings_allplots_sf$species,
                                               "Pinus monticola",
                                               "Tsuga heterophylla"))
 
-# Convert sf to sp to ppp pbjects 
+# Convert sf to sp to ppp pbjects
 seedlings_allplots_sp = as(seedlings_allplots_sf, "Spatial")
 seedlings_allplots_ppp = as(seedlings_allplots_sp, "ppp")
 
@@ -994,49 +999,49 @@ marks(tsuga_hete_pooled) <- NULL
 ppm_seedlings_pooled = kppm(seedlings_pooled ~ distance_tree_im
                             + aspect_im + rix_im + wind_im +
                               mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                            "Thomas", kernel="epanechnikov", correction="isotropic", 
+                            "Thomas", kernel="epanechnikov", correction="isotropic",
                             sigma=bw_likelihood_allplots)
 
-ppm_pinus_con_pooled = kppm(pinus_con_pooled ~ distance_tree_im + 
-                              aspect_im + rix_im + wind_im + 
+ppm_pinus_con_pooled = kppm(pinus_con_pooled ~ distance_tree_im +
+                              aspect_im + rix_im + wind_im +
                               mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                            "Thomas", kernel="epanechnikov", correction="isotropic", 
+                            "Thomas", kernel="epanechnikov", correction="isotropic",
                             sigma=bw_likelihood_allplots)
 
 ppm_larix_spp_pooled = kppm(larix_spp_pooled ~ distance_tree_im +
-                              aspect_im + rix_im + wind_im + 
+                              aspect_im + rix_im + wind_im +
                               mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                            "Thomas", kernel="epanechnikov", correction="isotropic", 
+                            "Thomas", kernel="epanechnikov", correction="isotropic",
                             sigma=bw_likelihood_allplots)
 
-ppm_picea_eng_pooled = kppm(picea_eng_pooled ~ distance_tree_im + 
-                              aspect_im + rix_im + wind_im + 
+ppm_picea_eng_pooled = kppm(picea_eng_pooled ~ distance_tree_im +
+                              aspect_im + rix_im + wind_im +
                               mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                            "Thomas", kernel="epanechnikov", correction="isotropic", 
+                            "Thomas", kernel="epanechnikov", correction="isotropic",
                             sigma=bw_likelihood_allplots)
 
-ppm_pseudo_m_pooled = kppm(pseudo_m_pooled ~ distance_tree_im + 
-                             aspect_im + rix_im + wind_im + 
+ppm_pseudo_m_pooled = kppm(pseudo_m_pooled ~ distance_tree_im +
+                             aspect_im + rix_im + wind_im +
                              mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                           "Thomas", kernel="epanechnikov", correction="isotropic", 
+                           "Thomas", kernel="epanechnikov", correction="isotropic",
                            sigma=bw_likelihood_allplots)
 
-ppm_pinus_pond_pooled = kppm(pinus_pond_pooled ~ distance_tree_im + 
-                               aspect_im + rix_im + wind_im + 
+ppm_pinus_pond_pooled = kppm(pinus_pond_pooled ~ distance_tree_im +
+                               aspect_im + rix_im + wind_im +
                              mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                           "Thomas", kernel="epanechnikov", correction="isotropic", 
+                           "Thomas", kernel="epanechnikov", correction="isotropic",
                            sigma=bw_likelihood_allplots)
 
-ppm_pinus_monti_pooled = kppm(pinus_monti_pooled ~ distance_tree_im + 
-                                aspect_im + rix_im + wind_im + 
+ppm_pinus_monti_pooled = kppm(pinus_monti_pooled ~ distance_tree_im +
+                                aspect_im + rix_im + wind_im +
                              mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                           "Thomas", kernel="epanechnikov", correction="isotropic", 
+                           "Thomas", kernel="epanechnikov", correction="isotropic",
                            sigma=bw_likelihood_allplots)
 
-ppm_tsuga_hete_pooled = kppm(tsuga_hete_pooled ~ distance_tree_im + 
-                               aspect_im + rix_im + wind_im + 
+ppm_tsuga_hete_pooled = kppm(tsuga_hete_pooled ~ distance_tree_im +
+                               aspect_im + rix_im + wind_im +
                              mpb_grey_im + mpb_red_im + fire_high_im + fire_low_im,
-                           "Thomas", kernel="epanechnikov", correction="isotropic", 
+                           "Thomas", kernel="epanechnikov", correction="isotropic",
                            sigma=bw_likelihood_allplots)
 
 summary(ppm_seedlings_pooled)
