@@ -22,7 +22,7 @@ SMurphy
     Optimization](#32-seedling-bandwidth-optimization)
   - [3.3 Seedling Point Processe
     Models](#33-seedling-point-processe-models)
-  - [3.4 Alternative Mode: Disturbance
+  - [3.4 Alternative Model: Disturbance
     Interactions](#34-alternative-mode-disturbance-interactions)
 
 ## 1. Model Selection
