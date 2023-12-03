@@ -3828,7 +3828,7 @@ summary(ppm_tsuga_hete_pooled)
     Bound on distance from Poisson process (over window): 1
          = min (1, 81.98862, 23049.96, 22799.9, 150.9209)
 
-### 3.4 Alternative Mode: Disturbance Interactions
+### 3.4 Alternative Model: Disturbance Interactions
 
 Alternative model `see_formula6.2` identified in section ‘1.1 Model
 Fitting’ is tested below. This includes additional variables of
