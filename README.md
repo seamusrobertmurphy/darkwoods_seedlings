@@ -23,7 +23,7 @@ SMurphy
   - [3.3 Seedling Point Processe
     Models](#33-seedling-point-processe-models)
   - [3.4 Alternative Model: Disturbance
-    Interactions](#34-alternative-mode-disturbance-interactions)
+    Interactions](#34-alternativel-mode-disturbance-interactions)
 
 ## 1. Model Selection
 
